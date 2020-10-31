@@ -1,11 +1,11 @@
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    from .IntentWithoutEntity import Prediction as PredictionWOE
-    from .IntentWithEntity import Prediction as PredictionWE
-    from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
-    from .IntentWithEntity import Preprocessing, LoadingData, DesignModel
+from .IntentWithoutEntity import Prediction as PredictionWOE
+from .IntentWithEntity import Prediction as PredictionWE
+from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
+from .IntentWithEntity import Preprocessing, LoadingData, DesignModel
 
 
 def intent_classify(phrase, entities):
