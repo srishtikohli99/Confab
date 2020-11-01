@@ -1,7 +1,3 @@
-
-
-# if __name__ == '__main__':
-
 from .IntentWithoutEntity import Prediction as PredictionWOE
 from .IntentWithEntity import Prediction as PredictionWE
 from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
@@ -21,6 +17,8 @@ def intent_classify(phrase, entities):
     WOE, r = pred_objWOE.predict(phrase)
     WE, r = pred_objWE.predict(phrase_modified)
     for key in WE:
+        print(key)
+        print(WOE[key])
         final[key] = WE[key] + WOE[key]
         if final[key] > maximum:
             intent = key

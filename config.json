@@ -1,0 +1,7 @@
+{
+    "epochs":20,
+    "batchSize": 64,
+    "smallTalk": false,
+    "maxLength": 50
+
+}

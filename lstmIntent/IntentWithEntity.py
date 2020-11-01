@@ -23,6 +23,8 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import re
+import math
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -34,8 +36,8 @@ class CustomUnpickler(pickle.Unpickler):
 
 class LoadingData():
             
-    def __init__(self):
-        train_file_path = os.path.join(os.getcwd(), "../../data")
+    def __init__(self, smallTalk):
+        train_file_path = os.path.join(os.getcwd(), "data")
         self.id2intent = {}
         self.intent2id = {}
         self.category_id=0
@@ -43,15 +45,26 @@ class LoadingData():
         print(train_file_path)
         data = {}
         for file in os.listdir(train_file_path):
-            f = open(os.path.join(train_file_path,str(file)))
-            dat = json.load(f)
-            for key in dat:
-                data[key] = dat[key]
-                self.intent2id[key] = self.category_id
-                self.category_id+=1
+            if smallTalk and str(file) == "SmallTalk":
+                path = os.path.join(train_file_path, "SmallTalk")
+                for fil in os.listdir(path):
+                    f = open(os.path.join(path,str(fil)))
+                    dat = json.load(f)
+                    for key in dat:
+                        data[key] = dat[key]
+                        self.intent2id[key] = self.category_id
+                        self.category_id+=1
+            elif str(file) != "SmallTalk":
+                f = open(os.path.join(train_file_path,str(file)))
+                dat = json.load(f)
+                for key in dat:
+                    data[key] = dat[key]
+                    self.intent2id[key] = self.category_id
+                    self.category_id+=1
         self.data = data
         training_data=self.data_helper()
-        self.train_data_frame = pd.DataFrame(training_data, columns =['query', 'intent','category'])   
+        self.train_data_frame = pd.DataFrame(training_data, columns =['query', 'intent','category']) 
+        #self.train_data_frame.to_csv("out.csv",index=False)  
         for key in self.intent2id:
             self.id2intent[self.intent2id[key]]=key
         self.train_data_frame = self.train_data_frame.sample(frac = 1)
@@ -87,9 +100,9 @@ class Preprocessing():
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
 
-    def createData(self, data):
+    def createData(self, data, maxLength):
         self.tokenizer = Tokenizer(num_words=None)
-        self.max_len = 50
+        self.max_len = maxLength
         self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
         self.tokenizer.fit_on_texts(list(self.x_train) + list(self.x_valid))
         # index = len(self.tokenizer.word_index) + 1
@@ -127,19 +140,29 @@ class DesignModel():
         self.y_valid = preprocess_obj.y_valid
         
     def simple_rnn(self,preprocess_obj,classes):
+        
         self.model = Sequential()
-        self.model.add(Embedding(len(preprocess_obj.word_index) + 1,100,input_length=preprocess_obj.max_len))
-        self.model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))
-        self.model.add(Dense(100, activation='relu'))
+        self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
+        self.model.add(LSTM(32, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
+        self.model.add(LSTM(64, dropout=0.25, recurrent_dropout=0.2, return_sequences=True))
+        self.model.add(LSTM(128, dropout=0.3, recurrent_dropout=0.2))
+        self.model.add(Dense(128, activation='relu'))
+        self.model.add(Dense(256, activation='relu'))
+        self.model.add(Dropout(0.2))
+        self.model.add(Dense(512, activation='relu'))
+        self.model.add(Dense(64, activation='relu'))
         self.model.add(Dense(classes, activation='softmax'))
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         
         
     def model_train(self,batch_size,num_epoch):
+        filepath = os.path.join(os.getcwd(),"lstmIntent/models/weightsWE.best.hdf5")
+        call_back = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
+        checkpoints = [call_back]
         print("Fitting to model")
-        self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1)
+        self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
         print("Model Training complete.")
-        self.model.save("models/IntentWithEntity"+".h5")
+        self.model.save(os.path.join(os.getcwd(),"lstmIntent/models/IntentWithEntity"+".h5"))
 
 
 
@@ -174,16 +197,31 @@ class Prediction():
         return resulti, result
 
 if __name__ == '__main__':
-    data = LoadingData()
+
+    with open(os.path.join(os.getcwd(),"config.json")) as f:
+        config = json.load(f)
+    epochs = 20
+    batchSize = 64
+    maxLength = 50
+    smallTalk = False
+    if "epochs" in config.keys():
+        epochs = config["epochs"]
+    if "batchSize" in config.keys():
+        batchSize = config["batchSize"]
+    if "maxLength" in config.keys():
+        maxLength = config["maxLength"]
+    if "smallTalk" in config.keys():
+        smallTalk = config["smallTalk"]
+    data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing()
-    preprocess_obj.createData(data)
+    preprocess_obj.createData(data, maxLength)
     model_obj = DesignModel(preprocess_obj)
     model_obj.simple_rnn(preprocess_obj,data.category_id)
-    model_obj.model_train(64,1)
+    model_obj.model_train(batchSize,epochs)
 
-    with open("models/WEpreprocess_obj.pkl","wb") as f:
+    with open(os.path.join(os.getcwd(),"lstmIntent/models/WEpreprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
 
-    with open("models/WEid2intent.pkl","wb") as f3:
+    with open(os.path.join(os.getcwd(),"lstmIntent/models/WEid2intent.pkl"),"wb") as f3:
         pickle.dump(data.id2intent,f3)
 
