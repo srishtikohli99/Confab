@@ -70,9 +70,12 @@ class Classifier:
 
     def train(self, data):
 
+        print("Training Classifier")
         self.pipe.fit(data.phrases,data.intent)
+        print("Training Complete")
         intent = self.pipe.predict(data.phrases)
         accuracy = accuracy_score(data.intent,intent)
+        print("Training Score")
         print(accuracy)
         with open(os.path.join(os.getcwd(), 'bureau/models/entityClassifier.pkl'), "wb") as f:
                 pickle.dump(self.pipe, f)
@@ -96,7 +99,7 @@ class Predict:
         data = LoadingData(test = True)
         y = self.pipe.predict(data.phrases)
         accuracy = accuracy_score(data.intent,y)
-        print("Testing Acc")
+        print("Testing Score")
         print(accuracy)
         
 

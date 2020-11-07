@@ -34,9 +34,7 @@ class LoadingData():
                 self.cat_to_intent[category_id] = intent_id
                 self.intent_to_cat[intent_id] = category_id
                 category_id+=1
-        print(self.cat_to_intent)
-        print(self.intent_to_cat)
-        '''Training data'''
+        
         training_data = list() 
         for dirname, _, filenames in os.walk(train_file_path):
             for filename in filenames:
@@ -49,7 +47,7 @@ class LoadingData():
 
 
 
-        '''Validation data'''
+        
         validation_data = list()    
         for dirname, _, filenames in os.walk(validation_file_path):
             for filename in filenames:
@@ -80,7 +78,6 @@ class LoadingData():
             for i in range(3):
                 sent = sent.replace("  "," ")
             sent_list.append((sent,enties))
-#         print(sent_list)
         return sent_list
 
 

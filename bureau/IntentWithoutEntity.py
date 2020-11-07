@@ -42,6 +42,7 @@ class LoadingData():
         self.id2intent = {}
         self.intent2id = {}
         self.category_id=0
+        print("TRAINIING DIRECTORY PATH")
         print(train_file_path)
         data = {}
         for file in os.listdir(train_file_path):
@@ -70,22 +71,8 @@ class LoadingData():
         for key in self.intent2id:
             self.id2intent[self.intent2id[key]]=key
         self.train_data_frame = self.train_data_frame.sample(frac = 1)
-        # print(self.train_data_frame)
 
     def data_helper(self):
-        # print(self.data)
-        # for phrase in self.data["data"]:
-        #     # print(phrase)
-        #     if phrase["intent"] not in intent2id:   
-        #         intent2id[phrase["intent"]] = category_id
-        #         category_id+=1
-        #     entities = []
-        #     for entity in phrase["entities"]:
-        #         entities.append(phrase["text"][entity["start"]:entity["end"]])
-        #     for entity in entities:
-        #         phrase["text"] = phrase["text"].replace(entity,"")
-        #     sent_list.append((phrase["text"],phrase["intent"],intent2id[phrase["intent"]]))
-        # self.category_id = category_id
 
         sent_list = list()
         for key in self.data:
@@ -107,8 +94,6 @@ class Preprocessing():
     def __init__(self):
         self.x_train = None
         self.y_train = None
-        # self.x_valid = None
-        # self.y_valid = None
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
 
@@ -116,28 +101,23 @@ class Preprocessing():
         self.tokenizer = Tokenizer(num_words=None)
         with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "rb") as f:
                 self.max_len = pickle.load(f)
-        # self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
         self.x_train = data.train_data_frame['query'].tolist()
         self.y_train = data.train_data_frame['category'].tolist()
         self.tokenizer.fit_on_texts(list(self.x_train))
 
-        #zero pad the sequences
+        
         if embedding != "custom":
             for i in range(len(self.x_train)):
                 self.x_train[i] = text_to_word_sequence(self.x_train[i])
             self.y_train = to_categorical(self.y_train)
-            print("printing")
-            print(self.x_train[100])
+
         if embedding == "custom":
             self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
-            # self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
-            print("printing")
-            print(self.x_train[0])
             self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
-            # self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
+            
             self.y_train = to_categorical(self.y_train)
-            # self.y_valid = to_categorical(self.y_valid)
         self.word_index = self.tokenizer.word_index
+        printing("Setting Maximum Length to : ")
         print(self.max_len)
         
     def getSpacyEmbeddings(self,sentneces):
@@ -154,15 +134,12 @@ class DesignModel():
         self.model = None
         self.x_train = preprocess_obj.x_train
         self.y_train = preprocess_obj.y_train
-        # self.x_valid = preprocess_obj.x_valid
-        # self.y_valid = preprocess_obj.y_valid
 
     def Word2VecEmbed(self, preprocess_obj):
         
-        print("here1")
+        print("Training Word2Vec")
         Word2VecModel = Word2Vec(self.x_train,size=10*math.floor(math.log(len(preprocess_obj.word_index),10)),min_count=1)
-        print("here2")
-        # print(Word2VecModel.wv["restaurant"])
+        print("Trained")
         Word2VecModel.save(os.path.join(os.getcwd(), "bureau/models/Word2VecWOE.model"))
         return Word2VecModel
         
@@ -175,7 +152,7 @@ class DesignModel():
                 words = self.x_train[i]
                 wv = []
                 for w in words:
-                    if w not in model.wv.vocab.keys():# is None:
+                    if w not in model.wv.vocab.keys():
                         continue
                     wvec = model.wv[w]
                     wv.append(wvec)
@@ -186,7 +163,6 @@ class DesignModel():
         if embedding == "custom":
             self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
         
-        # self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
         self.model.add(LSTM(32, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(64, dropout=0.25, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(128, dropout=0.3, recurrent_dropout=0.2))
@@ -214,11 +190,7 @@ class DesignModel():
 
 class Prediction():
     def __init__(self):
-        # print("INIT___________________")
-        # with open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), "rb") as f1:
-        #     preprocess_obj = pickle.load(f1)
         preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), 'rb')).load()
-        print("preprocess loaded-----------------")
         model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithoutEntity.h5'))
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
@@ -227,11 +199,9 @@ class Prediction():
     def Word2VecPredict(self, query):
 
         model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'bureau/models/Word2VecWOE.model'))
-        query = text_to_word_sequence(query)
-        
-        wv=[]
+        query = text_to_word_sequence(query)wv=[]
         for w in query:
-            if w not in model.wv.vocab.keys():# is None:
+            if w not in model.wv.vocab.keys():
                 continue
             wvec = model.wv[w]
             wv.append(wvec)
@@ -241,12 +211,10 @@ class Prediction():
         
     
     def predict(self,query, embedding):
-        # print("PREDICT__________________")
         with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
                 id2intent = pickle.load(f3)
         if embedding!="custom":
             query = self.Word2VecPredict(query)
-            # print(query)
             pred = self.model.predict(query)
 
         else:
@@ -256,11 +224,6 @@ class Prediction():
             pred = self.model.predict(query_pad)
         
         predi = np.argmax(pred)
-        # print("--------------------------")
-        # print(pred)
-        # print(pred[0][predi])
-        # if  pred[0][predi]<0.5:
-        #     return "Sorry, I don't understand!!"
         result = id2intent[predi]
         resulti = {}
         for i in range(len(pred[0])):
