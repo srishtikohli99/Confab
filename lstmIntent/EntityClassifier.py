@@ -8,6 +8,7 @@ from sklearn.svm import LinearSVC, SVC
 import pickle
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.tree import DecisionTreeClassifier
 
 class LoadingData():
             
@@ -26,8 +27,6 @@ class LoadingData():
                 for key in dat:
                     self.data[key] = dat[key]
         self.data_helper()
-        print(len(self.phrases))
-        print(len(self.intent))
 
 
     def data_helper(self):
@@ -60,9 +59,11 @@ class Classifier:
 
         self.clf = clf
         if clf == "svm":
-            self.pipe = Pipeline([('bow',CountVectorizer()),('clf',LinearSVC())])
+            self.pipe = Pipeline([('bow',CountVectorizer()),('clf',LinearSVC(probability=True))])
         elif clf == "svcRBF":
-            self.pipe = Pipeline([('bow',CountVectorizer()),('clf',SVC(kernel='rbf', C=0.01))])
+            self.pipe = Pipeline([('bow',CountVectorizer()),('clf',SVC(kernel='rbf', C=0.01, probability=True))])
+        elif clf =="dectree":
+            self.pipe = Pipeline([('bow',CountVectorizer()),('clf',DecisionTreeClassifier())])
         else:
             self.pipe = Pipeline([('bow',CountVectorizer()),('clf',RandomForestClassifier(max_depth=2, random_state=0, n_estimators=100))])
         
@@ -95,7 +96,7 @@ class Predict:
         data = LoadingData(test = True)
         y = self.pipe.predict(data.phrases)
         accuracy = accuracy_score(data.intent,y)
-        print("here")
+        print("Testing Acc")
         print(accuracy)
         
 

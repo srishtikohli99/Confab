@@ -52,9 +52,9 @@ def predictor(sentence):
     tokenized_sentence = config.TOKENIZER.encode(sentence)
 
     sentence = sentence.split()
-    print(sentence)
-    print(tokenized_sentence)
-    print((config.TOKENIZER.decode(tokenized_sentence)))
+    # print(sentence)
+    # print(tokenized_sentence)
+    # print((config.TOKENIZER.decode(tokenized_sentence)))
     #print(config.TOKENIZER.convert_ids_to_tokens(tokenized_sentence))
     bert_tokens = config.TOKENIZER.convert_ids_to_tokens(tokenized_sentence)
 
