@@ -1,4 +1,6 @@
 {
+    "entityExtractor" :"flair",
+    "flairEmbedding" : "glove",
     "epochs":1,
     "batchSize": 64,
     "smallTalk": false,

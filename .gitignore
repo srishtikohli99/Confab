@@ -136,3 +136,6 @@ dmypy.json
 .vscode/
 data/
 lstmIntent/models/
+flairEntity/resources
+flairEntity/train.txt
+flairEntity/test.txt

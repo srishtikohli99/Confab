@@ -11,6 +11,7 @@ with open(os.path.join(os.getcwd(),"config.json")) as f:
 embedding = config["embedding"]
 confidence = config["confidence"]
 fallback = config["fallback"]
+entityExtractor = config["entityExtractor"]
 
 pred_objWOE = PredictionWOE()
 pred_objWE = PredictionWE()
@@ -27,6 +28,41 @@ def intent_classify(phrase, entities):
         
         WOE, r = pred_objWOE.predict(phrase, embedding)
         print(WOE[r])
+
+    elif entityExtractor == "flair":
+        phrase_modified = entities[0]
+        phrase_ml = entities[1]
+
+        if len(phrase_ml) == 0:
+            WOE, r1 = pred_objWOE.predict(phrase, embedding)
+            WE, r2 = pred_objWE.predict(phrase, embedding)
+            maximum = 0
+            for key in WE:
+                if WE[key] + WOE[key] > maximum:
+                    maximum = WE[key] + WOE[key]
+                    r=key
+            if maximum >= confidence*2 :
+                print(r)
+            else:
+                print(fallback)
+        else:
+            WOE, r1 = pred_objWOE.predict(phrase, embedding)
+            WE, r2 = pred_objWE.predict(phrase_modified, embedding)
+            r3 = pred_classifier.predict(phrase_ml)
+            if r1 == r2 and r1 == r3:
+                print(r1)
+            else:
+                maximum = 0
+                for key in WE:
+                    if WE[key] + WOE[key] > maximum:
+                        maximum = WE[key] + WOE[key]
+                        r=key
+                if maximum >= confidence*2 :
+                    print(r)
+                else:
+                    print(fallback)
+
+
 
     else:
         if len(entities) == 0:

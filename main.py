@@ -1,5 +1,6 @@
 from bertEntity import predict
 from lstmIntent import classifier
+from flairEntity import predict as pred_flair
 import os
 import json
 
@@ -21,7 +22,10 @@ if __name__ == '__main__':
         if phrase == '0':
             break
         if config["entity"]:
-            entities = entity_extraction_bert(phrase)
+            if config["entityExtractor"] == "flair":
+                entities = pred_flair.FlairPredict(phrase)
+            else:
+                entities = entity_extraction_bert(phrase)
         else:
             entities = None
         classifier.intent_classify(phrase, entities)
