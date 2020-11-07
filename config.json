@@ -1,5 +1,5 @@
 {
-    "epochs":10,
+    "epochs":1,
     "batchSize": 64,
     "smallTalk": false,
     "action": true,

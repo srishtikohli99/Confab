@@ -45,6 +45,9 @@ class LoadingData():
         print(train_file_path)
         data = {}
         for file in os.listdir(train_file_path):
+
+            if str(file) == "Validate":
+                continue
             if smallTalk and str(file) == "SmallTalk":
                 path = os.path.join(train_file_path, "SmallTalk")
                 for fil in os.listdir(path):
@@ -104,8 +107,8 @@ class Preprocessing():
     def __init__(self):
         self.x_train = None
         self.y_train = None
-        self.x_valid = None
-        self.y_valid = None
+        # self.x_valid = None
+        # self.y_valid = None
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
 
@@ -113,8 +116,10 @@ class Preprocessing():
         self.tokenizer = Tokenizer(num_words=None)
         with open(os.path.join(os.getcwd(), 'lstmIntent/models/maxlength.pkl'), "rb") as f:
                 self.max_len = pickle.load(f)
-        self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
-        self.tokenizer.fit_on_texts(list(self.x_train) + list(self.x_valid))
+        # self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
+        self.x_train = data.train_data_frame['query'].tolist()
+        self.y_train = data.train_data_frame['category'].tolist()
+        self.tokenizer.fit_on_texts(list(self.x_train))
 
         #zero pad the sequences
         if embedding != "custom":
@@ -125,13 +130,13 @@ class Preprocessing():
             print(self.x_train[100])
         if embedding == "custom":
             self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
-            self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
+            # self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
             print("printing")
             print(self.x_train[0])
             self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
-            self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
+            # self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
             self.y_train = to_categorical(self.y_train)
-            self.y_valid = to_categorical(self.y_valid)
+            # self.y_valid = to_categorical(self.y_valid)
         self.word_index = self.tokenizer.word_index
         print(self.max_len)
         
@@ -149,8 +154,8 @@ class DesignModel():
         self.model = None
         self.x_train = preprocess_obj.x_train
         self.y_train = preprocess_obj.y_train
-        self.x_valid = preprocess_obj.x_valid
-        self.y_valid = preprocess_obj.y_valid
+        # self.x_valid = preprocess_obj.x_valid
+        # self.y_valid = preprocess_obj.y_valid
 
     def Word2VecEmbed(self, preprocess_obj):
         
