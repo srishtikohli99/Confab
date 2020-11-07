@@ -1,6 +1,6 @@
-from bertEntity import predict
-from lstmIntent import classifier
-from flairEntity import predict as pred_flair
+from Morph.bertEntity import predict
+from bureau import classifier
+from Morph.flairEntity import predict as pred_flair
 import os
 import json
 

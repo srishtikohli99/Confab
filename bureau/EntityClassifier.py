@@ -74,7 +74,7 @@ class Classifier:
         intent = self.pipe.predict(data.phrases)
         accuracy = accuracy_score(data.intent,intent)
         print(accuracy)
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/entityClassifier.pkl'), "wb") as f:
+        with open(os.path.join(os.getcwd(), 'bureau/models/entityClassifier.pkl'), "wb") as f:
                 pickle.dump(self.pipe, f)
     
 
@@ -83,7 +83,7 @@ class Predict:
 
     def __init__(self):
 
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/entityClassifier.pkl'), "rb") as f:
+        with open(os.path.join(os.getcwd(), 'bureau/models/entityClassifier.pkl'), "rb") as f:
             self.pipe = pickle.load(f)
 
     def predict(self, phrase):

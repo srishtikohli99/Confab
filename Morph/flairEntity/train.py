@@ -155,7 +155,7 @@ class Prediction:
 
     def __init__(self):
 
-        self.model = SequenceTagger.load(os.path.join(os.getcwd(), 'flairEntity/resources/best-model.pt'))
+        self.model = SequenceTagger.load(os.path.join(os.getcwd(), 'Morph/flairEntity/resources/best-model.pt'))
 
     def predict(self, phrase):
 
@@ -173,15 +173,15 @@ if __name__ == '__main__':
     embedding = config["flairEmbedding"]
 
     load_data_obj = LoadingData()
-    create_data(load_data_obj.train_data_frame, os.path.join(os.getcwd(), "flairEntity/train.txt"))
-    create_data(load_data_obj.validation_data_frame, os.path.join(os.getcwd(), "flairEntity/test.txt"))
+    create_data(load_data_obj.train_data_frame, os.path.join(os.getcwd(), "Morph/flairEntity/train.txt"))
+    create_data(load_data_obj.validation_data_frame, os.path.join(os.getcwd(), "Morph/flairEntity/test.txt"))
     columns = {0 : 'text', 1 : 'ner'}
     # directory where the data resides
     data_folder = './'
     # initializing the corpus
     corpus: Corpus = ColumnCorpus(data_folder, columns,
-                                train_file = os.path.join(os.getcwd(), "flairEntity/train.txt"),
-                                dev_file = os.path.join(os.getcwd(), "flairEntity/test.txt"))
+                                train_file = os.path.join(os.getcwd(), "Morph/flairEntity/train.txt"),
+                                dev_file = os.path.join(os.getcwd(), "Morph/flairEntity/test.txt"))
     # tag to predict
     tag_type = 'ner'
     # make tag dictionary from the corpus
@@ -216,7 +216,7 @@ if __name__ == '__main__':
                                        use_crf=True)
     print(tagger)
     trainer : ModelTrainer = ModelTrainer(tagger, corpus)
-    trainer.train(os.path.join(os.getcwd(), 'flairEntity/resources/best-model.pt'),
+    trainer.train(os.path.join(os.getcwd(), 'Morph/flairEntity/resources/best-model.pt'),
               learning_rate=0.1,
               mini_batch_size=32,
               max_epochs=50)

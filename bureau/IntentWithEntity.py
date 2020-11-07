@@ -152,7 +152,7 @@ class Preprocessing():
             self.y_train = to_categorical(self.y_train)
             # self.y_valid = to_categorical(self.y_valid)
         self.word_index = self.tokenizer.word_index
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/maxlength.pkl'), "wb") as f:
+        with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "wb") as f:
                 pickle.dump(self.max_len,f)
         print(self.max_len)
         # print("-----------------------------------------------------------------------------------")
@@ -181,7 +181,7 @@ class DesignModel():
         Word2VecModel = Word2Vec(self.x_train,size=10*math.floor(math.log(len(preprocess_obj.word_index),10)),min_count=1)
         print("here2")
         # print(Word2VecModel.wv["restaurant"])
-        Word2VecModel.save(os.path.join(os.getcwd(), "lstmIntent/models/Word2VecWE.model"))
+        Word2VecModel.save(os.path.join(os.getcwd(), "bureau/models/Word2VecWE.model"))
         return Word2VecModel
 
     def simple_rnn(self,preprocess_obj,classes, embedding):
@@ -221,30 +221,30 @@ class DesignModel():
         
         
     def model_train(self,batch_size,num_epoch):
-        filepath = os.path.join(os.getcwd(),"lstmIntent/models/weightsWE.best.hdf5")
+        filepath = os.path.join(os.getcwd(),"bureau/models/weightsWE.best.hdf5")
         call_back = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
         checkpoints = [call_back]
         print("Fitting to model")
         self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
         print("Model Training complete.")
-        self.model.save(os.path.join(os.getcwd(),"lstmIntent/models/IntentWithEntity"+".h5"))
+        self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntity"+".h5"))
 
 
 
 
 class Prediction():
     def __init__(self):
-        # with open(os.path.join(os.getcwd(), 'lstmIntent/models/WEpreprocess_obj.pkl'), "rb") as f1:
+        # with open(os.path.join(os.getcwd(), 'bureau/models/WEpreprocess_obj.pkl'), "rb") as f1:
         #     preprocess_obj = pickle.load(f1)
-        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'lstmIntent/models/WEpreprocess_obj.pkl'), 'rb')).load()
-        model= keras.models.load_model(os.path.join(os.getcwd(), 'lstmIntent/models/IntentWithEntity.h5'))
+        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/WEpreprocess_obj.pkl'), 'rb')).load()
+        model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
 
     def Word2VecPredict(self, query):
 
-        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'lstmIntent/models/Word2VecWE.model'))
+        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'bureau/models/Word2VecWE.model'))
         query = text_to_word_sequence(query)
         
         wv=[]
@@ -261,7 +261,7 @@ class Prediction():
     
     def predict(self,query, embedding):
 
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/WEid2intent.pkl'), "rb") as f3:
+        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
                 id2intent = pickle.load(f3)
         if embedding!="custom":
             query = self.Word2VecPredict(query)
@@ -314,9 +314,9 @@ if __name__ == '__main__':
 
     model_obj.model_train(batchSize,epochs)
 
-    with open(os.path.join(os.getcwd(),"lstmIntent/models/WEpreprocess_obj.pkl"),"wb") as f:
+    with open(os.path.join(os.getcwd(),"bureau/models/WEpreprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
 
-    with open(os.path.join(os.getcwd(),"lstmIntent/models/WEid2intent.pkl"),"wb") as f3:
+    with open(os.path.join(os.getcwd(),"bureau/models/WEid2intent.pkl"),"wb") as f3:
         pickle.dump(data.id2intent,f3)
 

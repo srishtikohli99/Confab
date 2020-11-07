@@ -9,11 +9,11 @@ then
     if [[ $entityExtractor == $en ]]
     then
         # echo "here"
-        python flairEntity/train.py
+        python Morph/flairEntity/train.py
     fi
     # echo "here2"
-    python lstmIntent/EntityClassifier.py
-    python lstmIntent/IntentWithEntity.py
+    python bureau/EntityClassifier.py
+    python bureau/IntentWithEntity.py
 fi
 # echo "here3"
-python lstmIntent/IntentWithoutEntity.py
+python bureau/IntentWithoutEntity.py

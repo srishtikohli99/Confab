@@ -114,7 +114,7 @@ class Preprocessing():
 
     def createData(self, data, maxLength, embedding):
         self.tokenizer = Tokenizer(num_words=None)
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/maxlength.pkl'), "rb") as f:
+        with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "rb") as f:
                 self.max_len = pickle.load(f)
         # self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
         self.x_train = data.train_data_frame['query'].tolist()
@@ -163,7 +163,7 @@ class DesignModel():
         Word2VecModel = Word2Vec(self.x_train,size=10*math.floor(math.log(len(preprocess_obj.word_index),10)),min_count=1)
         print("here2")
         # print(Word2VecModel.wv["restaurant"])
-        Word2VecModel.save(os.path.join(os.getcwd(), "lstmIntent/models/Word2VecWOE.model"))
+        Word2VecModel.save(os.path.join(os.getcwd(), "bureau/models/Word2VecWOE.model"))
         return Word2VecModel
         
     def simple_rnn(self,preprocess_obj,classes, embedding):
@@ -200,14 +200,14 @@ class DesignModel():
         
         
     def model_train(self,batch_size,num_epoch):
-        filepath = os.path.join(os.getcwd(),"lstmIntent/models/weightsWOE.best.hdf5")
+        filepath = os.path.join(os.getcwd(),"bureau/models/weightsWOE.best.hdf5")
         call_back = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
         checkpoints = [call_back]
         print("Fitting to model")
         print(self.x_train.shape)
         self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
         print("Model Training complete.")
-        self.model.save(os.path.join(os.getcwd(),"lstmIntent/models/IntentWithoutEntity"+".h5"))
+        self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithoutEntity"+".h5"))
 
 
 
@@ -215,18 +215,18 @@ class DesignModel():
 class Prediction():
     def __init__(self):
         # print("INIT___________________")
-        # with open(os.path.join(os.getcwd(), 'lstmIntent/models/preprocess_obj.pkl'), "rb") as f1:
+        # with open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), "rb") as f1:
         #     preprocess_obj = pickle.load(f1)
-        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'lstmIntent/models/preprocess_obj.pkl'), 'rb')).load()
+        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), 'rb')).load()
         print("preprocess loaded-----------------")
-        model= keras.models.load_model(os.path.join(os.getcwd(), 'lstmIntent/models/IntentWithoutEntity.h5'))
+        model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithoutEntity.h5'))
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
 
     def Word2VecPredict(self, query):
 
-        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'lstmIntent/models/Word2VecWOE.model'))
+        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'bureau/models/Word2VecWOE.model'))
         query = text_to_word_sequence(query)
         
         wv=[]
@@ -242,7 +242,7 @@ class Prediction():
     
     def predict(self,query, embedding):
         # print("PREDICT__________________")
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/WEid2intent.pkl'), "rb") as f3:
+        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
                 id2intent = pickle.load(f3)
         if embedding!="custom":
             query = self.Word2VecPredict(query)
@@ -292,9 +292,9 @@ if __name__ == '__main__':
     model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
     model_obj.model_train(batchSize,epochs)
 
-    with open(os.path.join(os.getcwd(), "lstmIntent/models/preprocess_obj.pkl"),"wb") as f:
+    with open(os.path.join(os.getcwd(), "bureau/models/preprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
 
-    with open(os.path.join(os.getcwd(), "lstmIntent/models/id2intent.pkl"),"wb") as f3:
+    with open(os.path.join(os.getcwd(), "bureau/models/id2intent.pkl"),"wb") as f3:
         pickle.dump(data.id2intent,f3)
 
