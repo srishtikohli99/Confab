@@ -14,8 +14,9 @@ fallback = config["fallback"]
 entityExtractor = config["entityExtractor"]
 
 pred_objWOE = PredictionWOE()
-pred_objWE = PredictionWE()
-pred_classifier = Predict()
+if config["entity"]:
+    pred_objWE = PredictionWE()
+    pred_classifier = Predict()
 
 def intent_classify(phrase, entities):
     final = {}
@@ -43,14 +44,18 @@ def intent_classify(phrase, entities):
                     r=key
             if maximum >= confidence*2 :
                 print(r)
+                print(WOE[r])
+                print(WE[r])
             else:
                 print(fallback)
         else:
             WOE, r1 = pred_objWOE.predict(phrase, embedding)
             WE, r2 = pred_objWE.predict(phrase_modified, embedding)
+            print(phrase_modified)
             r3 = pred_classifier.predict(phrase_ml)
             if r1 == r2 and r1 == r3:
-                print(r1)
+                print(WOE[r1])
+                print(WE[r2])
             else:
                 maximum = 0
                 for key in WE:
@@ -58,6 +63,8 @@ def intent_classify(phrase, entities):
                         maximum = WE[key] + WOE[key]
                         r=key
                 if maximum >= confidence*2 :
+                    print(WOE[r])
+                    print(WE[r])
                     print(r)
                 else:
                     print(fallback)
@@ -86,13 +93,16 @@ def intent_classify(phrase, entities):
 
             for k, v in entities.items():
                 sent+=v + " "
-                phrase_modified = phrase_modified.replace(k, "entity"+v)
+                phrase_modified = phrase_modified.replace(k, "entity"+v.replace(" ","").replace("_",""))
 
             WOE, r1 = pred_objWOE.predict(phrase, embedding)
             WE, r2 = pred_objWE.predict(phrase_modified, embedding)
             r3 = pred_classifier.predict(sent)
+            print(phrase_modified)
             if r1 == r2 and r1 == r3:
                 print(r1)
+                print(WOE[r1])
+                print(WE[r2])
             else:
                 maximum = 0
                 for key in WE:

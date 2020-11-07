@@ -11,7 +11,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, Dense, GRU, Embedding, Bidirectional, Activation
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.text import Tokenizer, text_to_word_sequence
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers import LSTM
 from tensorflow.keras.layers import SimpleRNN
@@ -19,8 +19,6 @@ from tensorflow.keras.layers import Conv1D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import GlobalMaxPooling1D
-from tensorflow.keras.preprocessing.text import Tokenizer, text_to_word_sequence
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import re
 import math
@@ -76,6 +74,7 @@ class LoadingData():
         for key in self.intent2id:
             self.id2intent[self.intent2id[key]]=key
         self.train_data_frame = self.train_data_frame.sample(frac = 1)
+        # self.train_data_frame.to_csv("out.csv")
 
     def data_helper(self):
         sent_list = list()
@@ -118,13 +117,10 @@ class Preprocessing():
         if embedding != "custom":
             for i in range(len(self.x_train)):
                 self.x_train[i] = text_to_word_sequence(self.x_train[i])
-                if i==0:
                 sizes.append(len(self.x_train[i]))
             sizes = np.array(sizes)
             if maxLength == 0:
                 self.max_len = math.ceil(np.mean(sizes) + 2*(np.std(sizes)))
-            print("Setting maximum length to :")
-            print(self.max_len)
             self.y_train = to_categorical(self.y_train)
 
         if embedding == "custom":
@@ -141,6 +137,10 @@ class Preprocessing():
         self.word_index = self.tokenizer.word_index
         with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "wb") as f:
                 pickle.dump(self.max_len,f)
+        
+        print("Setting maximum length to :")
+        print(self.max_len)
+        print(self.tokenizer.word_index)
 
     def getSpacyEmbeddings(self,sentneces):
         sentences_vectors = list()
@@ -217,6 +217,9 @@ class Prediction():
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
+        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
+                self.id2intent = pickle.load(f3)
+
 
     def Word2VecPredict(self, query):
 
@@ -237,8 +240,7 @@ class Prediction():
     
     def predict(self,query, embedding):
 
-        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
-                id2intent = pickle.load(f3)
+        
         if embedding!="custom":
             query = self.Word2VecPredict(query)
             pred = self.model.predict(query)
@@ -246,13 +248,14 @@ class Prediction():
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
+            print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
             pred = self.model.predict(query_pad)
         predi = np.argmax(pred)
         resulti = {}
-        result = id2intent[predi]
+        result = self.id2intent[predi]
         for i in range(len(pred[0])):
-            resulti[id2intent[i]] = pred[0][i]
+            resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
 
 if __name__ == '__main__':

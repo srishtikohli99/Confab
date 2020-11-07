@@ -139,3 +139,4 @@ bureau/models/
 Morph/flairEntity/resources
 Morph/flairEntity/train.txt
 Morph/flairEntity/test.txt
+out.csv

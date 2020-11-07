@@ -19,8 +19,6 @@ from tensorflow.keras.layers import Conv1D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import GlobalMaxPooling1D
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import math
 from tensorflow.keras.callbacks import ModelCheckpoint
@@ -117,7 +115,7 @@ class Preprocessing():
             
             self.y_train = to_categorical(self.y_train)
         self.word_index = self.tokenizer.word_index
-        printing("Setting Maximum Length to : ")
+        print("Setting Maximum Length to : ")
         print(self.max_len)
         
     def getSpacyEmbeddings(self,sentneces):
@@ -195,11 +193,15 @@ class Prediction():
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
+        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
+                self.id2intent = pickle.load(f3)
+
 
     def Word2VecPredict(self, query):
 
         model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'bureau/models/Word2VecWOE.model'))
-        query = text_to_word_sequence(query)wv=[]
+        query = text_to_word_sequence(query)
+        wv=[]
         for w in query:
             if w not in model.wv.vocab.keys():
                 continue
@@ -211,8 +213,8 @@ class Prediction():
         
     
     def predict(self,query, embedding):
-        with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
-                id2intent = pickle.load(f3)
+        
+
         if embedding!="custom":
             query = self.Word2VecPredict(query)
             pred = self.model.predict(query)
@@ -224,10 +226,10 @@ class Prediction():
             pred = self.model.predict(query_pad)
         
         predi = np.argmax(pred)
-        result = id2intent[predi]
+        result = self.id2intent[predi]
         resulti = {}
         for i in range(len(pred[0])):
-            resulti[id2intent[i]] = pred[0][i]
+            resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
 
 if __name__ == '__main__':
