@@ -1,5 +1,5 @@
 {
-    "entityExtractor" :"flair",
+    "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
     "epochs":1,
     "batchSize": 64,
