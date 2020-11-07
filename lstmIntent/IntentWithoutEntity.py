@@ -1,5 +1,5 @@
-import numpy as np # linear algebra
-import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import numpy as np 
+import pandas as pd 
 import json
 import os
 import en_core_web_sm
@@ -11,7 +11,7 @@ from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Input, Dense, GRU, Embedding, Bidirectional, Activation
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.text import Tokenizer, text_to_word_sequence
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.layers import LSTM
 from tensorflow.keras.layers import SimpleRNN
@@ -24,6 +24,8 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import math
 from tensorflow.keras.callbacks import ModelCheckpoint
+from gensim.models import Word2Vec
+import gensim
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -107,20 +109,31 @@ class Preprocessing():
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
 
-    def createData(self, data, maxLength):
+    def createData(self, data, maxLength, embedding):
         self.tokenizer = Tokenizer(num_words=None)
-        self.max_len = maxLength
+        with open(os.path.join(os.getcwd(), 'lstmIntent/models/maxlength.pkl'), "rb") as f:
+                self.max_len = pickle.load(f)
         self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
         self.tokenizer.fit_on_texts(list(self.x_train) + list(self.x_valid))
-        self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
-        self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
 
         #zero pad the sequences
-        self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
-        self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
-        self.y_train = to_categorical(self.y_train)
-        self.y_valid = to_categorical(self.y_valid)
+        if embedding != "custom":
+            for i in range(len(self.x_train)):
+                self.x_train[i] = text_to_word_sequence(self.x_train[i])
+            self.y_train = to_categorical(self.y_train)
+            print("printing")
+            print(self.x_train[100])
+        if embedding == "custom":
+            self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
+            self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
+            print("printing")
+            print(self.x_train[0])
+            self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
+            self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
+            self.y_train = to_categorical(self.y_train)
+            self.y_valid = to_categorical(self.y_valid)
         self.word_index = self.tokenizer.word_index
+        print(self.max_len)
         
     def getSpacyEmbeddings(self,sentneces):
         sentences_vectors = list()
@@ -138,11 +151,37 @@ class DesignModel():
         self.y_train = preprocess_obj.y_train
         self.x_valid = preprocess_obj.x_valid
         self.y_valid = preprocess_obj.y_valid
+
+    def Word2VecEmbed(self, preprocess_obj):
         
-    def simple_rnn(self,preprocess_obj,classes):
+        print("here1")
+        Word2VecModel = Word2Vec(self.x_train,size=10*math.floor(math.log(len(preprocess_obj.word_index),10)),min_count=1)
+        print("here2")
+        # print(Word2VecModel.wv["restaurant"])
+        Word2VecModel.save(os.path.join(os.getcwd(), "lstmIntent/models/Word2VecWOE.model"))
+        return Word2VecModel
+        
+    def simple_rnn(self,preprocess_obj,classes, embedding):
         
         self.model = Sequential()
-        self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
+        if embedding == "Word2Vec":
+            model = self.Word2VecEmbed(preprocess_obj)
+            for i in range(len(self.x_train)):
+                words = self.x_train[i]
+                wv = []
+                for w in words:
+                    if w not in model.wv.vocab.keys():# is None:
+                        continue
+                    wvec = model.wv[w]
+                    wv.append(wvec)
+                self.x_train[i] = np.array(wv)
+            self.x_train = np.array(self.x_train)
+            self.x_train = keras.preprocessing.sequence.pad_sequences(self.x_train, maxlen=preprocess_obj.max_len, dtype='float32', padding='post', truncating='post')
+
+        if embedding == "custom":
+            self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
+        
+        # self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
         self.model.add(LSTM(32, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(64, dropout=0.25, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(128, dropout=0.3, recurrent_dropout=0.2))
@@ -160,6 +199,7 @@ class DesignModel():
         call_back = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
         checkpoints = [call_back]
         print("Fitting to model")
+        print(self.x_train.shape)
         self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
         print("Model Training complete.")
         self.model.save(os.path.join(os.getcwd(),"lstmIntent/models/IntentWithoutEntity"+".h5"))
@@ -178,15 +218,38 @@ class Prediction():
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
+
+    def Word2VecPredict(self, query):
+
+        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'lstmIntent/models/Word2VecWOE.model'))
+        query = text_to_word_sequence(query)
+        
+        wv=[]
+        for w in query:
+            if w not in model.wv.vocab.keys():# is None:
+                continue
+            wvec = model.wv[w]
+            wv.append(wvec)
+        query = np.array(wv)
+        query = keras.preprocessing.sequence.pad_sequences([query], maxlen=preprocess_obj.max_len, dtype='float32', padding='post', truncating='post')
+        return query
         
     
-    def predict(self,query):
+    def predict(self,query, embedding):
         # print("PREDICT__________________")
-        with open(os.path.join(os.getcwd(), 'lstmIntent/models/id2intent.pkl'),"rb") as f3:
-            id2intent = pickle.load(f3)
-        query_seq = self.tokenizer.texts_to_sequences([query])
-        query_pad = pad_sequences(query_seq, maxlen=self.max_len)
-        pred = self.model.predict(query_pad)
+        with open(os.path.join(os.getcwd(), 'lstmIntent/models/WEid2intent.pkl'), "rb") as f3:
+                id2intent = pickle.load(f3)
+        if embedding!="custom":
+            query = self.Word2VecPredict(query)
+            # print(query)
+            pred = self.model.predict(query)
+
+        else:
+            
+            query_seq = self.tokenizer.texts_to_sequences([query])
+            query_pad = pad_sequences(query_seq, maxlen=self.max_len)
+            pred = self.model.predict(query_pad)
+        
         predi = np.argmax(pred)
         # print("--------------------------")
         # print(pred)
@@ -204,8 +267,9 @@ if __name__ == '__main__':
         config = json.load(f)
     epochs = 20
     batchSize = 64
-    maxLength = 50
+    maxLength = 0
     smallTalk = False
+    embedding = "custom"
     if "epochs" in config.keys():
         epochs = config["epochs"]
     if "batchSize" in config.keys():
@@ -214,11 +278,13 @@ if __name__ == '__main__':
         maxLength = config["maxLength"]
     if "smallTalk" in config.keys():
         smallTalk = config["smallTalk"]
+    if "embedding" in config.keys():
+        embedding = config["embedding"]
     data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing()
-    preprocess_obj.createData(data, maxLength)
+    preprocess_obj.createData(data, maxLength, embedding)
     model_obj = DesignModel(preprocess_obj)
-    model_obj.simple_rnn(preprocess_obj,data.category_id)
+    model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
     model_obj.model_train(batchSize,epochs)
 
     with open(os.path.join(os.getcwd(), "lstmIntent/models/preprocess_obj.pkl"),"wb") as f:

@@ -19,12 +19,14 @@ from tensorflow.keras.layers import Conv1D
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import GlobalMaxPooling1D
-from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.text import Tokenizer, text_to_word_sequence
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import pickle
 import re
 import math
 from tensorflow.keras.callbacks import ModelCheckpoint
+from gensim.models import Word2Vec
+import gensim
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -78,7 +80,7 @@ class LoadingData():
                 sent =""
                 for i in each_list:
                     if 'entity' in i.keys():
-                        entity = "ENTITY" + i["entity"].replace(" ","").replace("_","")
+                        entity = "entity" + i["entity"].replace(" ","").replace("_","")
                         sent += entity + " "
                         self.entityList.add(entity)
                     else:
@@ -92,33 +94,62 @@ class LoadingData():
 
 
 class Preprocessing():
-    def __init__(self):
+    def __init__(self, maxLength):
         self.x_train = None
         self.y_train = None
         self.x_valid = None
         self.y_valid = None
+        self.max_len = maxLength
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
 
-    def createData(self, data, maxLength):
+    def createData(self, data, maxLength, embedding):
+        sizes = []
         self.tokenizer = Tokenizer(num_words=None)
         self.max_len = maxLength
         self.x_train, self.x_valid, self.y_train, self.y_valid = train_test_split(data.train_data_frame['query'].tolist(),data.train_data_frame['category'].tolist(),test_size=0.1)
         self.tokenizer.fit_on_texts(list(self.x_train) + list(self.x_valid))
+        #self.x_train = self.tokenizer.
         # index = len(self.tokenizer.word_index) + 1
         # for entity in data.entityList:
         #     self.tokenizer.word_index[entity] = index
         #     index+=1
         # print(type(self.x_train))
         # print(self.x_train[0])
-        self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
-        self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
-        # print(self.x_train[0])
-        self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
-        self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
-        self.y_train = to_categorical(self.y_train)
-        self.y_valid = to_categorical(self.y_valid)
+        if embedding != "custom":
+            for i in range(len(self.x_train)):
+                self.x_train[i] = text_to_word_sequence(self.x_train[i])
+                if i==0:
+                    print(type(self.x_train[i]))
+                sizes.append(len(self.x_train[i]))
+            sizes = np.array(sizes)
+            if maxLength == 0:
+                
+                self.max_len = math.ceil(np.mean(sizes) + 2*(np.std(sizes)))
+            self.y_train = to_categorical(self.y_train)
+            print("printing")
+            # print(sizes)
+            # print(np.mean(sizes))
+            # print(np.std(sizes))
+            # print(self.x_train)
+        if embedding == "custom":
+            self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
+            self.x_valid = self.tokenizer.texts_to_sequences(self.x_valid)
+            if maxLength == 0:
+                for i in range(len(self.x_train)):
+                    sizes.append(len(self.x_train[i]))
+                sizes = np.array(sizes)
+                self.max_len = math.ceil(np.mean(sizes) + 2*(np.std(sizes)))
+            print("printing")
+            print(self.x_train[0])
+            self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
+            self.x_valid = pad_sequences(self.x_valid, maxlen=self.max_len)
+            self.y_train = to_categorical(self.y_train)
+            self.y_valid = to_categorical(self.y_valid)
         self.word_index = self.tokenizer.word_index
+        with open(os.path.join(os.getcwd(), 'lstmIntent/models/maxlength.pkl'), "wb") as f:
+                pickle.dump(self.max_len,f)
+        print(self.max_len)
         # print("-----------------------------------------------------------------------------------")
         # print(self.word_index)
 
@@ -138,11 +169,40 @@ class DesignModel():
         self.y_train = preprocess_obj.y_train
         self.x_valid = preprocess_obj.x_valid
         self.y_valid = preprocess_obj.y_valid
+
+    def Word2VecEmbed(self, preprocess_obj):
         
-    def simple_rnn(self,preprocess_obj,classes):
+        print("here1")
+        Word2VecModel = Word2Vec(self.x_train,size=10*math.floor(math.log(len(preprocess_obj.word_index),10)),min_count=1)
+        print("here2")
+        # print(Word2VecModel.wv["restaurant"])
+        Word2VecModel.save(os.path.join(os.getcwd(), "lstmIntent/models/Word2VecWE.model"))
+        return Word2VecModel
+
+    def simple_rnn(self,preprocess_obj,classes, embedding):
         
         self.model = Sequential()
-        self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
+
+        if embedding == "Word2Vec":
+            model = self.Word2VecEmbed(preprocess_obj)
+            #self.x_train.to_csv("out.csv", index=True)
+            #print(self.x_train)
+            # print(type(self.x_train))
+            # print(type(self.x_train[0]))
+            for i in range(len(self.x_train)):
+                words = self.x_train[i]
+                wv = []
+                for w in words:
+                    if w not in model.wv.vocab.keys():# is None:
+                        continue
+                    wvec = model.wv[w]
+                    wv.append(wvec)
+                self.x_train[i] = np.array(wv)
+            self.x_train = np.array(self.x_train)
+            self.x_train = keras.preprocessing.sequence.pad_sequences(self.x_train, maxlen=preprocess_obj.max_len, dtype='float32', padding='post', truncating='post')
+
+        if embedding == "custom":
+            self.model.add(Embedding(len(preprocess_obj.word_index) + 1,10*math.floor(math.log(len(preprocess_obj.word_index),10)),input_length=preprocess_obj.max_len))
         self.model.add(LSTM(32, dropout=0.2, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(64, dropout=0.25, recurrent_dropout=0.2, return_sequences=True))
         self.model.add(LSTM(128, dropout=0.3, recurrent_dropout=0.2))
@@ -176,14 +236,38 @@ class Prediction():
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
+
+    def Word2VecPredict(self, query):
+
+        model = gensim.models.Word2Vec.load(os.path.join(os.getcwd(), 'lstmIntent/models/Word2VecWE.model'))
+        query = text_to_word_sequence(query)
+        
+        wv=[]
+        for w in query:
+            if w not in model.wv.vocab.keys():# is None:
+                continue
+            wvec = model.wv[w]
+            wv.append(wvec)
+        query = np.array(wv)
+        query = keras.preprocessing.sequence.pad_sequences([query], maxlen=preprocess_obj.max_len, dtype='float32', padding='post', truncating='post')
+        return query
+
         
     
-    def predict(self,query):
+    def predict(self,query, embedding):
+
         with open(os.path.join(os.getcwd(), 'lstmIntent/models/WEid2intent.pkl'), "rb") as f3:
-            id2intent = pickle.load(f3)
-        query_seq = self.tokenizer.texts_to_sequences([query])
-        query_pad = pad_sequences(query_seq, maxlen=self.max_len)
-        pred = self.model.predict(query_pad)
+                id2intent = pickle.load(f3)
+        if embedding!="custom":
+            query = self.Word2VecPredict(query)
+            # print(query)
+            pred = self.model.predict(query)
+
+        else:
+            
+            query_seq = self.tokenizer.texts_to_sequences([query])
+            query_pad = pad_sequences(query_seq, maxlen=self.max_len)
+            pred = self.model.predict(query_pad)
         predi = np.argmax(pred)
         # print("--------------------------")
         # print(pred)
@@ -202,8 +286,9 @@ if __name__ == '__main__':
         config = json.load(f)
     epochs = 20
     batchSize = 64
-    maxLength = 50
+    maxLength = 0
     smallTalk = False
+    embedding = "custom"
     if "epochs" in config.keys():
         epochs = config["epochs"]
     if "batchSize" in config.keys():
@@ -212,11 +297,16 @@ if __name__ == '__main__':
         maxLength = config["maxLength"]
     if "smallTalk" in config.keys():
         smallTalk = config["smallTalk"]
+    if "embedding" in config.keys():
+        embedding = config["embedding"]
     data = LoadingData(smallTalk)
-    preprocess_obj = Preprocessing()
-    preprocess_obj.createData(data, maxLength)
+    preprocess_obj = Preprocessing(maxLength)
+    preprocess_obj.createData(data, maxLength,embedding)
     model_obj = DesignModel(preprocess_obj)
-    model_obj.simple_rnn(preprocess_obj,data.category_id)
+    model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
+    # print(model_obj.x_train)
+    # print(type(model_obj.x_train))
+
     model_obj.model_train(batchSize,epochs)
 
     with open(os.path.join(os.getcwd(),"lstmIntent/models/WEpreprocess_obj.pkl"),"wb") as f:

@@ -1,7 +1,10 @@
 {
-    "epochs":20,
+    "epochs":10,
     "batchSize": 64,
     "smallTalk": false,
-    "maxLength": 50
-
+    "action": true,
+    "embedding": "custom",
+    "confidence": 0.6,
+    "entity" : true,
+    "clf" : "svcRBF"
 }
