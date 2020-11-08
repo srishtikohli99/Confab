@@ -107,14 +107,23 @@ class Preprocessing():
         self.tokenizer = None
 
     def createData(self, data, maxLength, embedding):
+
+        with open(os.path.join(os.getcwd(), 'synonyms.json'), "rb") as f:
+            synonyms = json.load(f)
         sizes = []
         self.tokenizer = Tokenizer(num_words=None)
         self.max_len = maxLength
         self.x_train = data.train_data_frame['query'].tolist()
         self.y_train = data.train_data_frame['category'].tolist()
         self.tokenizer.fit_on_texts(list(self.x_train))
+        for key in synonyms:
+            if key in self.tokenizer.word_index:
+                for synonym in synonyms[key]:
+                    if synonym not in self.tokenizer.word_index:
+                        self.tokenizer.word_index[synonym] = self.tokenizer.word_index[key]
 
         if embedding != "custom":
+
             for i in range(len(self.x_train)):
                 self.x_train[i] = text_to_word_sequence(self.x_train[i])
                 sizes.append(len(self.x_train[i]))
@@ -124,13 +133,13 @@ class Preprocessing():
             self.y_train = to_categorical(self.y_train)
 
         if embedding == "custom":
+
             self.x_train = self.tokenizer.texts_to_sequences(self.x_train)
             if maxLength == 0:
                 for i in range(len(self.x_train)):
                     sizes.append(len(self.x_train[i]))
                 sizes = np.array(sizes)
                 self.max_len = math.ceil(np.mean(sizes) + 2*(np.std(sizes)))
-            
             self.x_train = pad_sequences(self.x_train, maxlen=self.max_len)
             self.y_train = to_categorical(self.y_train)
 

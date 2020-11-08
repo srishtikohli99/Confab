@@ -1,7 +1,7 @@
 {
     "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
-    "epochs":20,
+    "epochs":10,
     "batchSize": 64,
     "smallTalk": true,
     "action": true,

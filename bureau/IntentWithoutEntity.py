@@ -96,12 +96,20 @@ class Preprocessing():
         self.tokenizer = None
 
     def createData(self, data, maxLength, embedding):
+
+        with open(os.path.join(os.getcwd(), 'synonyms.json'), "rb") as f:
+            synonyms = json.load(f)
         self.tokenizer = Tokenizer(num_words=None)
         with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "rb") as f:
                 self.max_len = pickle.load(f)
         self.x_train = data.train_data_frame['query'].tolist()
         self.y_train = data.train_data_frame['category'].tolist()
         self.tokenizer.fit_on_texts(list(self.x_train))
+        for key in synonyms:
+            if key in self.tokenizer.word_index:
+                for synonym in synonyms[key]:
+                    if synonym not in self.tokenizer.word_index:
+                        self.tokenizer.word_index[synonym] = self.tokenizer.word_index[key]
 
         
         if embedding != "custom":
@@ -222,6 +230,7 @@ class Prediction():
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
+            print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
             pred = self.model.predict(query_pad)
         
