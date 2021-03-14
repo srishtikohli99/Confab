@@ -36,8 +36,10 @@ class CustomUnpickler(pickle.Unpickler):
 
 class LoadingData():
             
-    def __init__(self, smallTalk):
+    def __init__(self, smallTalk=False, test=False):
         train_file_path = os.path.join(os.getcwd(), "data")
+        if test:
+            train_file_path = os.path.join(os.getcwd(),"data/Validate")
         self.id2intent = {}
         self.intent2id = {}
         self.category_id=0
@@ -45,9 +47,12 @@ class LoadingData():
         print("Training Data Directory")
         print(train_file_path)
         data = {}
+        val_data = {}
         for file in os.listdir(train_file_path):
 
             if str(file) == "Validate":
+                continue
+            if str(file) == ".DS_Store":
                 continue
 
             if smallTalk and str(file) == "SmallTalk":
@@ -149,7 +154,7 @@ class Preprocessing():
         
         print("Setting maximum length to :")
         print(self.max_len)
-        print(self.tokenizer.word_index)
+        # print(self.tokenizer.word_index)
 
     def getSpacyEmbeddings(self,sentneces):
         sentences_vectors = list()
@@ -177,7 +182,8 @@ class DesignModel():
     def simple_rnn(self,preprocess_obj,classes, embedding):
         
         self.model = Sequential()
-
+        print("Setting embedding size to : ")
+        print(10*math.floor(math.log(len(preprocess_obj.word_index),10)))
         if embedding == "Word2Vec":
             model = self.Word2VecEmbed(preprocess_obj)
             for i in range(len(self.x_train)):
@@ -213,6 +219,7 @@ class DesignModel():
         print("Fitting to model")
         self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
         print("Model Training complete.")
+
         self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntity"+".h5"))
 
 
@@ -221,6 +228,11 @@ class DesignModel():
 class Prediction():
 
     def __init__(self):
+
+        with open(os.path.join(os.getcwd(),"config.json")) as f:
+            config = json.load(f)
+        if "embedding" in config.keys():
+            self.embedding = config["embedding"]
         preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/WEpreprocess_obj.pkl'), 'rb')).load()
         model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
         self.model = model
@@ -247,7 +259,7 @@ class Prediction():
 
         
     
-    def predict(self,query, embedding):
+    def predict(self,query, embedding, test=False):
 
         
         if embedding!="custom":
@@ -257,15 +269,28 @@ class Prediction():
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
-            print(query_seq)
+            # print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
             pred = self.model.predict(query_pad)
         predi = np.argmax(pred)
+        if test:
+            return predi
         resulti = {}
         result = self.id2intent[predi]
         for i in range(len(pred[0])):
             resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
+    
+    def test(self):
+        data = LoadingData(test=True)
+        samples = data.train_data_frame['query'].tolist()
+        labels = data.train_data_frame['category'].tolist()
+        predictedLabels = []
+        for sample in samples:
+            i = self.predict(sample, self.embedding, test=True)
+            predictedLabels.append(i)
+        score = accuracy_score(np.array(predictedLabels),np.array(labels))
+        return score
 
 if __name__ == '__main__':
 
