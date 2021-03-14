@@ -35,8 +35,10 @@ class CustomUnpickler(pickle.Unpickler):
 
 class LoadingData():
             
-    def __init__(self, smallTalk):
+    def __init__(self, smallTalk = False, test=False):
         train_file_path = os.path.join(os.getcwd(),"data")
+        if test:
+            train_file_path = os.path.join(os.getcwd(),"data/Validate")
         self.id2intent = {}
         self.intent2id = {}
         self.category_id=0
@@ -46,6 +48,8 @@ class LoadingData():
         for file in os.listdir(train_file_path):
 
             if str(file) == "Validate":
+                continue
+            if str(file) == ".DS_Store":
                 continue
             if smallTalk and str(file) == "SmallTalk":
                 path = os.path.join(train_file_path, "SmallTalk")
@@ -58,6 +62,7 @@ class LoadingData():
                         self.category_id+=1
             elif str(file) != "SmallTalk":
                 f = open(os.path.join(train_file_path,str(file)))
+                print(f)
                 dat = json.load(f)
                 for key in dat:
                     data[key] = dat[key]
@@ -196,13 +201,17 @@ class DesignModel():
 
 class Prediction():
     def __init__(self):
+        with open(os.path.join(os.getcwd(),"config.json")) as f:
+            config = json.load(f)
+        if "embedding" in config.keys():
+            self.embedding = config["embedding"]
         preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), 'rb')).load()
         model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithoutEntity.h5'))
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
         with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
-                self.id2intent = pickle.load(f3)
+            self.id2intent = pickle.load(f3)
 
 
     def Word2VecPredict(self, query):
@@ -220,7 +229,7 @@ class Prediction():
         return query
         
     
-    def predict(self,query, embedding):
+    def predict(self,query, embedding, test=False):
         
 
         if embedding!="custom":
@@ -230,16 +239,30 @@ class Prediction():
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
-            print(query_seq)
+            # print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
             pred = self.model.predict(query_pad)
         
         predi = np.argmax(pred)
+        if test:
+            return predi
         result = self.id2intent[predi]
         resulti = {}
         for i in range(len(pred[0])):
             resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
+
+    def test(self):
+        data = LoadingData(test=True)
+        samples = data.train_data_frame['query'].tolist()
+        labels = data.train_data_frame['category'].tolist()
+        predictedLabels = []
+        for sample in samples:
+            i = self.predict(sample, self.embedding, test=True)
+            predictedLabels.append(i)
+        score = accuracy_score(np.array(predictedLabels),np.array(labels))
+        return score
+        
 
 if __name__ == '__main__':
     with open(os.path.join(os.getcwd(),"config.json")) as f:

@@ -83,8 +83,10 @@ def intent_classify(phrase, entities):
                     r=key
             if maximum >= confidence*2 :
                 print(r)
+                return r
             else:
                 print(fallback)
+                return r
 
         
         else:
@@ -98,11 +100,12 @@ def intent_classify(phrase, entities):
             WOE, r1 = pred_objWOE.predict(phrase, embedding)
             WE, r2 = pred_objWE.predict(phrase_modified, embedding)
             r3 = pred_classifier.predict(sent)
-            print(phrase_modified)
+            # print(phrase_modified)
             if r1 == r2 and r1 == r3:
                 print(r1)
-                print(WOE[r1])
-                print(WE[r2])
+                return r1
+                # print(WOE[r1])
+                # print(WE[r2])
             else:
                 maximum = 0
                 for key in WE:
@@ -111,5 +114,7 @@ def intent_classify(phrase, entities):
                         r=key
                 if maximum >= confidence*2 :
                     print(r)
+                    return r
                 else:
                     print(fallback)
+                    return r
