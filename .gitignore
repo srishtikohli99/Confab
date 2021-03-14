@@ -135,7 +135,8 @@ dmypy.json
 .DS_Store
 .vscode/
 data/
-lstmIntent/models/
-flairEntity/resources
-flairEntity/train.txt
-flairEntity/test.txt
+bureau/models/
+Morph/flairEntity/resources
+Morph/flairEntity/train.txt
+Morph/flairEntity/test.txt
+out.csv

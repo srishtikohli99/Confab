@@ -1,6 +1,6 @@
 import transformers
 import os
-BASE_PATH = os.path.join(os.getcwd(), 'bertEntity/')
+BASE_PATH = os.path.join(os.getcwd(), 'Morph/bertEntity/')
 MAX_LEN = 128
 TRAIN_BATCH_SIZE = 32
 VALID_BATCH_SIZE = 8

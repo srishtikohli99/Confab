@@ -1,8 +1,14 @@
-from bertEntity import predict
-from lstmIntent import classifier
-from flairEntity import predict as pred_flair
+from bureau import classifier
 import os
 import json
+
+with open(os.path.join(os.getcwd(),"config.json")) as f:
+    config = json.load(f)
+
+if config["entityExtractor"] == "flair":
+    from Morph.flairEntity import predict as pred_flair
+else:
+    from Morph.bertEntity import predict
 
 
 def entity_extraction_bert(phrase):
@@ -11,12 +17,9 @@ def entity_extraction_bert(phrase):
     return entities
 
 if __name__ == '__main__':
-
-    with open(os.path.join(os.getcwd(),"config.json")) as f:
-        config = json.load(f)
     
-
     while True:
+        
         print("Hit me up, ask...")
         phrase = input()
         if phrase == '0':

@@ -11,12 +11,10 @@ def FlairPredict(phrase):
     text2=""
     for entity in sentence.to_dict('ner')["entities"]:
         text3 += str(entity["labels"]).split(" ")[0][1:] + " "
-        text2 += text[start:entity['start_pos']] + "entity_"+str(entity["labels"]).split(" ")[0][1:]
+        text2 += text[start:entity['start_pos']] + "entity"+str(entity["labels"]).split(" ")[0][1:].replace(" ","").replace("_","")
         start = entity['end_pos']
 
     text3=text3[:-1]
     text2+=text[start:n]
-    print(text2)
-    print(text3)
     return (text2,text3)
 
