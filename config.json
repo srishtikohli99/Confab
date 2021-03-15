@@ -2,13 +2,15 @@
     "entity" : true,
     "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
-    "epochs":20,
+    "epochs": 10,
     "batchSize": 64,
     "smallTalk": false,
     "action": false,
     "embedding": "custom",
     "confidence": 0.1,
     "clf" : "decTree",
+    "maxLength": 0,
+    "model": "Attention",
     "fallback" : "Sorry, I do not understand."
  }
  

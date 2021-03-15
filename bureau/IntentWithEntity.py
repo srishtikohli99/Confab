@@ -25,6 +25,16 @@ import math
 from tensorflow.keras.callbacks import ModelCheckpoint
 from gensim.models import Word2Vec
 import gensim
+import keras
+from keras.layers import Layer
+import keras.backend as K
+import tensorflow as tf
+from keras.models import Sequential
+from keras import Model
+from keras.layers.core import Activation, Dropout, Dense
+from keras.layers import Flatten, Input, Layer, GlobalMaxPooling1D, LSTM, Bidirectional, Concatenate
+from keras.layers.embeddings import Embedding
+from keras import optimizers
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -162,6 +172,31 @@ class Preprocessing():
             query_vec = self.spacy_model(item) 
             sentences_vectors.append(query_vec.vector)
         return sentences_vectors
+
+
+@tf.keras.utils.register_keras_serializable()
+class attention2(Layer):
+    def __init__(self,**kwargs):
+        super(attention2,self).__init__(**kwargs)
+
+    def build(self,input_shape):
+        self.W=self.add_weight(name="att_weight",shape=(input_shape[-1],1),initializer="normal")
+        self.b=self.add_weight(name="att_bias",shape=(input_shape[1],1),initializer="zeros")        
+        super(attention2, self).build(input_shape)
+
+    def call(self,x):
+        et=K.squeeze(K.tanh(K.dot(x,self.W)+self.b),axis=-1)
+        at=K.softmax(et)
+        at=K.expand_dims(at,axis=-1)
+        output=x*at
+        return K.sum(output,axis=1)
+
+    def compute_output_shape(self,input_shape):
+        return (input_shape[0],input_shape[-1])
+
+    def get_config(self):
+        return super(attention2,self).get_config()
+
     
 
 
@@ -222,6 +257,37 @@ class DesignModel():
 
         self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntity"+".h5"))
 
+    def bidir_lstm(self,preprocess_obj,classes, embedding):
+
+        dropout=0.3
+        recurrent_dropout=0.3
+        lr=0.0005
+        ## Embedding Layer
+        sequence_input = Input(shape=(preprocess_obj.max_len,))
+        # self.model.add(Embedding(,,input_length=preprocess_obj.max_len))
+        embedded_sequences = Embedding(len(preprocess_obj.word_index) + 1, 10*math.floor(math.log(len(preprocess_obj.word_index),10)))(sequence_input)
+        ## RNN Layer
+        lstm = Bidirectional(LSTM(32, return_sequences = True, dropout=dropout, recurrent_dropout=recurrent_dropout))(embedded_sequences)
+        # Getting our LSTM outputs
+        (lstm, forward_h, forward_c, backward_h, backward_c) = Bidirectional(LSTM(32, return_sequences=True, return_state=True))(lstm)
+
+        ## Attention Layer
+        att_out=attention2()(lstm)
+        outputs=Dense(classes,activation='softmax')(att_out)
+        model_attn = Model(sequence_input, outputs)
+
+        adam = optimizers.Adam(lr=lr)
+        model_attn.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['acc'])
+        self.model = model_attn
+
+    def lstm_train(self,batch_size,num_epoch):
+        filepath = os.path.join(os.getcwd(),"bureau/models/IntentWithEntityAttn.h5")
+        call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
+        checkpoints = [call_back]
+        print("Fitting to model")
+        self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
+        print("Model Training complete.")
+        self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntityAttn"+".h5"))
 
 
 
@@ -234,7 +300,12 @@ class Prediction():
         if "embedding" in config.keys():
             self.embedding = config["embedding"]
         preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/WEpreprocess_obj.pkl'), 'rb')).load()
-        model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
+        if config["model"] == "SimpleRNN":
+            model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
+        else:
+            from keras.utils import CustomObjectScope
+            with CustomObjectScope({'AttentionLayer2': attention2}):
+                model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntityAttn.h5'))
         self.model = model
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
@@ -269,7 +340,6 @@ class Prediction():
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
-            # print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
             pred = self.model.predict(query_pad)
         predi = np.argmax(pred)
@@ -311,14 +381,26 @@ if __name__ == '__main__':
         smallTalk = config["smallTalk"]
     if "embedding" in config.keys():
         embedding = config["embedding"]
+    if "model" in config.keys():
+        mode = config["model"]
+
     data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing(maxLength)
     preprocess_obj.createData(data, maxLength,embedding)
     model_obj = DesignModel(preprocess_obj)
-    model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
+    if model == "SimpleRNN":
+        model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
+        model_obj.model_train(batchSize,epochs)
+    else:
+        model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
+        model_obj.lstm_train(batchSize,epochs)
+    model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
+    model_obj.lstm_train(batchSize,epochs)
 
-    model_obj.model_train(batchSize,epochs)
-
+    # from keras.utils import CustomObjectScope
+    #     with CustomObjectScope({'AttentionLayer': attention}):
+    #         model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntityAttn.h5'))
+    
     with open(os.path.join(os.getcwd(),"bureau/models/WEpreprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
 
