@@ -35,6 +35,9 @@ from keras.layers.core import Activation, Dropout, Dense
 from keras.layers import Flatten, Input, Layer, GlobalMaxPooling1D, LSTM, Bidirectional, Concatenate
 from keras.layers.embeddings import Embedding
 from keras import optimizers
+from keras.utils import CustomObjectScope
+from sklearn.model_selection import StratifiedKFold
+
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -280,21 +283,35 @@ class DesignModel():
         model_attn.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['acc'])
         self.model = model_attn
 
-    def lstm_train(self,batch_size,num_epoch):
-        filepath = os.path.join(os.getcwd(),"bureau/models/IntentWithEntityAttn.h5")
-        call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
-        checkpoints = [call_back]
-        print("Fitting to model")
-        self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
-        print("Model Training complete.")
-        self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntityAttn"+".h5"))
+    def lstm_train(self,batch_size,num_epoch, folds_):
+
+        y = []
+        folds = StratifiedKFold(n_splits=folds_, shuffle=True, random_state=256)
+        for i in range(len(self.y_train)):
+            for j in range(len(self.y_train[i])):
+                if self.y_train[i][j] == 1:
+                    y.append(j)
+        print(len(y))
+        y = np.array(y)
+        for fold_, (trn_idx, val_idx) in enumerate(folds.split(self.x_train,y)):
+            strLog = "fold {}".format(fold_)
+            print(strLog)
+            name = "IntentWithEntityAttn" + str(fold_) + ".h5"
+            filepath = os.path.join(os.getcwd(),"bureau/models/" + name)
+            call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
+            checkpoints = [call_back]
+            print("Fitting to model")
+            self.model.fit(self.x_train[trn_idx], self.y_train[trn_idx], batch_size=batch_size, epochs=num_epoch, validation_data = (self.x_train[val_idx], self.y_train[val_idx]), callbacks=checkpoints)
+            print("Model Training complete.")
+            self.model.save(os.path.join(os.getcwd(),"bureau/models/" + name))
 
 
 
 class Prediction():
 
-    def __init__(self):
+    def __init__(self, folds):
 
+        self.folds = folds
         with open(os.path.join(os.getcwd(),"config.json")) as f:
             config = json.load(f)
         if "embedding" in config.keys():
@@ -303,14 +320,15 @@ class Prediction():
         if config["model"] == "SimpleRNN":
             model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
         else:
-            from keras.utils import CustomObjectScope
-            with CustomObjectScope({'AttentionLayer2': attention2}):
-                model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntityAttn.h5'))
-        self.model = model
+            self.Models = []
+            for i in range(self.folds):
+                with CustomObjectScope({'AttentionLayer2': attention2}):
+                    model= keras.models.load_model(os.path.join(os.getcwd(), "bureau/models/IntentWithEntityAttn" + str(i)+ ".h5"))
+                    self.Models.append(model)
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
         with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
-                self.id2intent = pickle.load(f3)
+            self.id2intent = pickle.load(f3)
 
 
     def Word2VecPredict(self, query):
@@ -330,28 +348,48 @@ class Prediction():
 
         
     
-    def predict(self,query, embedding, test=False):
+    def predict(self,query, embedding, model = "Attention", test=False):
 
         
-        if embedding!="custom":
+        if embedding!="custom" and model == "SimpleRNN":
             query = self.Word2VecPredict(query)
             pred = self.model.predict(query)
+            resulti = {}
+            result = self.id2intent[predi]
+        
+        elif embedding == "custom" and model == "SimpleRNN":
+            query_seq = self.tokenizer.texts_to_sequences([query])
+            query_pad = pad_sequences(query_seq, maxlen=self.max_len)
+            pred = self.model.predict(query_pad)
 
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
-            pred = self.model.predict(query_pad)
+            for i in range(self.folds):
+                pred = self.Models[i].predict_step(query_pad)
+                # print(pred)
+                if i == 0:
+                    p = np.zeros(len(pred[0]))
+                    p=[p]
+                    # print(p)
+                for j in range(len(pred[0])):
+                    p[0][j] += pred[0][j]/self.folds
+            pred = p
+            # print(pred)
+
         predi = np.argmax(pred)
         if test:
             return predi
-        resulti = {}
         result = self.id2intent[predi]
+        # print("WithEntity" + result)
+        resulti = {}
         for i in range(len(pred[0])):
             resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
     
     def test(self):
+        # print("________________________TESTING_________________________")
         data = LoadingData(test=True)
         samples = data.train_data_frame['query'].tolist()
         labels = data.train_data_frame['category'].tolist()
@@ -382,7 +420,9 @@ if __name__ == '__main__':
     if "embedding" in config.keys():
         embedding = config["embedding"]
     if "model" in config.keys():
-        mode = config["model"]
+        model = config["model"]
+    if "folds" in config.keys():
+        folds = config["folds"]
 
     data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing(maxLength)
@@ -393,9 +433,7 @@ if __name__ == '__main__':
         model_obj.model_train(batchSize,epochs)
     else:
         model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
-        model_obj.lstm_train(batchSize,epochs)
-    model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
-    model_obj.lstm_train(batchSize,epochs)
+        model_obj.lstm_train(batchSize,epochs, folds)
 
     # from keras.utils import CustomObjectScope
     #     with CustomObjectScope({'AttentionLayer': attention}):

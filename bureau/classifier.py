@@ -1,7 +1,7 @@
 from .IntentWithoutEntity import Prediction as PredictionWOE
 from .IntentWithEntity import Prediction as PredictionWE
-from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel, attention
-from .IntentWithEntity import Preprocessing, LoadingData, DesignModel, attention2
+from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
+from .IntentWithEntity import Preprocessing, LoadingData, DesignModel
 from .EntityClassifier import LoadingData, Classifier, Predict
 import os
 import json
@@ -12,10 +12,13 @@ embedding = config["embedding"]
 confidence = config["confidence"]
 fallback = config["fallback"]
 entityExtractor = config["entityExtractor"]
+model = config["model"]
+if "folds" in config.keys():
+    folds = config["folds"]
 
-pred_objWOE = PredictionWOE()
+pred_objWOE = PredictionWOE(folds)
 if config["entity"]:
-    pred_objWE = PredictionWE()
+    pred_objWE = PredictionWE(folds)
     pred_classifier = Predict()
 
 def intent_classify(phrase, entities):
@@ -27,7 +30,7 @@ def intent_classify(phrase, entities):
 
     if entities is None:
         
-        WOE, r = pred_objWOE.predict(phrase, embedding)
+        WOE, r = pred_objWOE.predict(phrase, embedding, model)
         print(WOE[r])
 
     elif entityExtractor == "flair":
@@ -35,8 +38,8 @@ def intent_classify(phrase, entities):
         phrase_ml = entities[1]
 
         if len(phrase_ml) == 0:
-            WOE, r1 = pred_objWOE.predict(phrase, embedding)
-            WE, r2 = pred_objWE.predict(phrase, embedding)
+            WOE, r1 = pred_objWOE.predict(phrase, embedding, model)
+            WE, r2 = pred_objWE.predict(phrase, embedding, model)
             maximum = 0
             for key in WE:
                 if WE[key] + WOE[key] > maximum:
@@ -49,8 +52,8 @@ def intent_classify(phrase, entities):
             else:
                 print(fallback)
         else:
-            WOE, r1 = pred_objWOE.predict(phrase, embedding)
-            WE, r2 = pred_objWE.predict(phrase_modified, embedding)
+            WOE, r1 = pred_objWOE.predict(phrase, embedding, model)
+            WE, r2 = pred_objWE.predict(phrase_modified, embedding, model)
             print(phrase_modified)
             r3 = pred_classifier.predict(phrase_ml)
             if r1 == r2 and r1 == r3:
@@ -74,8 +77,8 @@ def intent_classify(phrase, entities):
     else:
         if len(entities) == 0:
             
-            WOE, r1 = pred_objWOE.predict(phrase, embedding)
-            WE, r2 = pred_objWE.predict(phrase, embedding)
+            WOE, r1 = pred_objWOE.predict(phrase, embedding, model)
+            WE, r2 = pred_objWE.predict(phrase, embedding, model)
             maximum = 0
             for key in WE:
                 if WE[key] + WOE[key] > maximum:
@@ -96,9 +99,11 @@ def intent_classify(phrase, entities):
             for k, v in entities.items():
                 sent+=v + " "
                 phrase_modified = phrase_modified.replace(k, "entity"+v.replace(" ","").replace("_",""))
-
-            WOE, r1 = pred_objWOE.predict(phrase, embedding)
-            WE, r2 = pred_objWE.predict(phrase_modified, embedding)
+            # print("here2")
+            WOE, r1 = pred_objWOE.predict(phrase, embedding, model)
+            # print("here3")
+            WE, r2 = pred_objWE.predict(phrase_modified, embedding, model)
+            # print("here4")
             r3 = pred_classifier.predict(sent)
             # print(phrase_modified)
             if r1 == r2 and r1 == r3:

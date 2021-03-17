@@ -22,7 +22,7 @@ if __name__ == '__main__':
     print(train_file_path)
     for file in os.listdir(train_file_path):
         print(str(file))
-        if str(file) == ".DS_Store":
+        if not str(file).endswith(".json"):
             continue
         f = open(os.path.join(train_file_path,str(file)))
         dat = json.load(f)

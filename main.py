@@ -31,6 +31,7 @@ if __name__ == '__main__':
                 entities = entity_extraction_bert(phrase)
         else:
             entities = None
+        print("here1")
         classifier.intent_classify(phrase, entities)
 
 
