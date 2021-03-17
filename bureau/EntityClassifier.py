@@ -11,8 +11,8 @@ from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier
 
 class LoadingData():
-            
-    def __init__(self, test):
+        
+    def __init__(self, test = False):
         if test:
             train_file_path = os.path.join(os.getcwd(),"data/Validate")
         else:
@@ -21,6 +21,8 @@ class LoadingData():
         self.intent=[]
         self.phrases = []
         for file in os.listdir(train_file_path):
+            if str(file) == ".DS_Store":
+                continue
             if str(file) != "SmallTalk" and str(file)!="Validate":
                 f = open(os.path.join(train_file_path,str(file)))
                 dat = json.load(f)
@@ -62,7 +64,7 @@ class Classifier:
             self.pipe = Pipeline([('bow',CountVectorizer()),('clf',LinearSVC(probability=True))])
         elif clf == "svcRBF":
             self.pipe = Pipeline([('bow',CountVectorizer()),('clf',SVC(kernel='rbf', C=0.01, probability=True))])
-        elif clf =="dectree":
+        elif clf =="decTree":
             self.pipe = Pipeline([('bow',CountVectorizer()),('clf',DecisionTreeClassifier())])
         else:
             self.pipe = Pipeline([('bow',CountVectorizer()),('clf',RandomForestClassifier(max_depth=2, random_state=0, n_estimators=100))])
@@ -111,7 +113,7 @@ if __name__ == '__main__':
     if "clf" in config.keys():
         clf = config["clf"]
 
-    data = LoadingData(test = False)
+    data = LoadingData(test = True)
     train = Classifier(clf)
     train.train(data)
     pred = Predict()

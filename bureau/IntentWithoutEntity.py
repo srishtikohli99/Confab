@@ -24,6 +24,18 @@ import math
 from tensorflow.keras.callbacks import ModelCheckpoint
 from gensim.models import Word2Vec
 import gensim
+import keras
+from keras.layers import Layer
+import keras.backend as K
+import tensorflow as tf
+from keras.models import Sequential
+from keras import Model
+from keras.layers.core import Activation, Dropout, Dense
+from keras.layers import Flatten, Input, Layer, GlobalMaxPooling1D, LSTM, Bidirectional, Concatenate
+from keras.layers.embeddings import Embedding
+from keras import optimizers
+from keras.utils import CustomObjectScope
+from sklearn.model_selection import StratifiedKFold
 
 class CustomUnpickler(pickle.Unpickler):
 
@@ -35,8 +47,10 @@ class CustomUnpickler(pickle.Unpickler):
 
 class LoadingData():
             
-    def __init__(self, smallTalk):
+    def __init__(self, smallTalk = False, test=False):
         train_file_path = os.path.join(os.getcwd(),"data")
+        if test:
+            train_file_path = os.path.join(os.getcwd(),"data/Validate")
         self.id2intent = {}
         self.intent2id = {}
         self.category_id=0
@@ -46,6 +60,8 @@ class LoadingData():
         for file in os.listdir(train_file_path):
 
             if str(file) == "Validate":
+                continue
+            if str(file) == ".DS_Store":
                 continue
             if smallTalk and str(file) == "SmallTalk":
                 path = os.path.join(train_file_path, "SmallTalk")
@@ -58,6 +74,7 @@ class LoadingData():
                         self.category_id+=1
             elif str(file) != "SmallTalk":
                 f = open(os.path.join(train_file_path,str(file)))
+                #   print(str(f))
                 dat = json.load(f)
                 for key in dat:
                     data[key] = dat[key]
@@ -133,6 +150,28 @@ class Preprocessing():
             sentences_vectors.append(query_vec.vector)
         return sentences_vectors
     
+@tf.keras.utils.register_keras_serializable()
+class attention(Layer):
+    def __init__(self,**kwargs):
+        super(attention,self).__init__(**kwargs)
+
+    def build(self,input_shape):
+        self.W=self.add_weight(name="att_weight",shape=(input_shape[-1],1),initializer="normal")
+        self.b=self.add_weight(name="att_bias",shape=(input_shape[1],1),initializer="zeros")        
+        super(attention, self).build(input_shape)
+
+    def call(self,x):
+        et=K.squeeze(K.tanh(K.dot(x,self.W)+self.b),axis=-1)
+        at=K.softmax(et)
+        at=K.expand_dims(at,axis=-1)
+        output=x*at
+        return K.sum(output,axis=1)
+
+    def compute_output_shape(self,input_shape):
+        return (input_shape[0],input_shape[-1])
+
+    def get_config(self):
+        return super(attention,self).get_config()
 
 
 class DesignModel():
@@ -191,18 +230,73 @@ class DesignModel():
         print("Model Training complete.")
         self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithoutEntity"+".h5"))
 
+    def bidir_lstm(self,preprocess_obj,classes, embedding):
+
+        dropout=0.3
+        recurrent_dropout=0.3
+        lr=0.0005
+        ## Embedding Layer
+        sequence_input = Input(shape=(preprocess_obj.max_len,))
+        # self.model.add(Embedding(,,input_length=preprocess_obj.max_len))
+        embedded_sequences = Embedding(len(preprocess_obj.word_index) + 1, 10*math.floor(math.log(len(preprocess_obj.word_index),10)))(sequence_input)
+        ## RNN Layer
+        lstm = Bidirectional(LSTM(32, return_sequences = True, dropout=dropout, recurrent_dropout=recurrent_dropout))(embedded_sequences)
+        # Getting our LSTM outputs
+        (lstm, forward_h, forward_c, backward_h, backward_c) = Bidirectional(LSTM(32, return_sequences=True, return_state=True))(lstm)
+
+        ## Attention Layer
+        att_out=attention()(lstm)
+        outputs=Dense(classes,activation='softmax')(att_out)
+        model_attn = Model(sequence_input, outputs)
+
+        adam = optimizers.Adam(lr=lr)
+        model_attn.compile(optimizer=adam, loss='categorical_crossentropy', metrics=['acc'])
+        self.model = model_attn
+
+    def lstm_train(self,batch_size,num_epoch, folds_):
+        y = []
+        folds = StratifiedKFold(n_splits=folds_, shuffle=True, random_state=256)
+        for i in range(len(self.y_train)):
+            for j in range(len(self.y_train[i])):
+                if self.y_train[i][j] == 1:
+                    y.append(j)
+        print(len(y))
+        y = np.array(y)
+        for fold_, (trn_idx, val_idx) in enumerate(folds.split(self.x_train,y)):
+            strLog = "fold {}".format(fold_)
+            print(strLog)
+            name = "IntentWithoutEntityAttn" + str(fold_) + ".h5"
+            filepath = os.path.join(os.getcwd(),"bureau/models/" + name)
+            call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
+            checkpoints = [call_back]
+            print("Fitting to model")
+            self.model.fit(self.x_train[trn_idx], self.y_train[trn_idx], batch_size=batch_size, epochs=num_epoch, validation_data = (self.x_train[val_idx], self.y_train[val_idx]), callbacks=checkpoints)
+            print("Model Training complete.")
+            self.model.save(os.path.join(os.getcwd(),"bureau/models/" + name))
 
 
 
 class Prediction():
-    def __init__(self):
-        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/preprocess_obj.pkl'), 'rb')).load()
-        model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithoutEntity.h5'))
-        self.model = model
+    def __init__(self, folds):
+
+        self.folds = folds
+        with open(os.path.join(os.getcwd(),"config.json")) as f:
+            config = json.load(f)
+        if "embedding" in config.keys():
+            self.embedding = config["embedding"]
+        preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/WOEpreprocess_obj.pkl'), 'rb')).load()
+        if config["model"] == "SimpleRNN":
+            model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithoutEntity.h5'))
+        else:
+            self.Models = []
+            for i in range(self.folds):
+                with CustomObjectScope({'AttentionLayer': attention}):
+                    model= keras.models.load_model(os.path.join(os.getcwd(), "bureau/models/IntentWithoutEntityAttn" + str(i)+ ".h5"))
+                    self.Models.append(model)
         self.tokenizer = preprocess_obj.tokenizer
         self.max_len = preprocess_obj.max_len
         with open(os.path.join(os.getcwd(), 'bureau/models/WEid2intent.pkl'), "rb") as f3:
-                self.id2intent = pickle.load(f3)
+            self.id2intent = pickle.load(f3)
 
 
     def Word2VecPredict(self, query):
@@ -220,26 +314,68 @@ class Prediction():
         return query
         
     
-    def predict(self,query, embedding):
+    def predict(self,query, embedding, model = "Attention", test=False):
         
 
-        if embedding!="custom":
+        if embedding!="custom" and model == "SimpleRNN":
             query = self.Word2VecPredict(query)
             pred = self.model.predict(query)
+            resulti = {}
+            result = self.id2intent[predi]
+        
+        elif embedding == "custom" and model == "SimpleRNN":
+            query_seq = self.tokenizer.texts_to_sequences([query])
+            query_pad = pad_sequences(query_seq, maxlen=self.max_len)
+            pred = self.model.predict(query_pad)
 
         else:
             
             query_seq = self.tokenizer.texts_to_sequences([query])
-            print(query_seq)
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
-            pred = self.model.predict(query_pad)
-        
+            for i in range(self.folds):
+                pred = self.Models[i].predict_step(query_pad)
+                # print(pred)
+                if i == 0:
+                    p = np.zeros(len(pred[0]))
+                    p=[p]
+                    # print(p)
+                for j in range(len(pred[0])):
+                    p[0][j] += pred[0][j]/self.folds
+            pred = p
+            # print(pred)
+            # i=0
+            # pred = self.Models[i].predict(query_pad)
+            # # print(pred)
+            # if i == 0:
+            #     p = np.zeros(len(pred[0]))
+            #     p=[p]
+            #     # print(p)
+            # for j in range(len(pred[0])):
+            #     p[0][j] += pred[0][j]/self.folds
+            # pred = p
+            # # print(pred)
+
         predi = np.argmax(pred)
+        if test:
+            return predi
         result = self.id2intent[predi]
+        # print("WithEntity" + result)
         resulti = {}
         for i in range(len(pred[0])):
             resulti[self.id2intent[i]] = pred[0][i]
         return resulti, result
+
+    def test(self):
+        data = LoadingData(test=True)
+        samples = data.train_data_frame['query'].tolist()
+        labels = data.train_data_frame['category'].tolist()
+        predictedLabels = []
+        for sample in samples:
+            i = self.predict(sample, self.embedding, test=True)
+            predictedLabels.append(i)
+        score = accuracy_score(np.array(predictedLabels),np.array(labels))
+        return score
+        
 
 if __name__ == '__main__':
     with open(os.path.join(os.getcwd(),"config.json")) as f:
@@ -259,16 +395,25 @@ if __name__ == '__main__':
         smallTalk = config["smallTalk"]
     if "embedding" in config.keys():
         embedding = config["embedding"]
+    if "model" in config.keys():
+        model = config["model"]
+    if "folds" in config.keys():
+        folds = config["folds"]
+    
     data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing()
     preprocess_obj.createData(data, maxLength, embedding)
     model_obj = DesignModel(preprocess_obj)
-    model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
-    model_obj.model_train(batchSize,epochs)
+    if model == "SimpleRNN":
+        model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
+        model_obj.model_train(batchSize,epochs)
+    else:
+        model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
+        model_obj.lstm_train(batchSize,epochs, folds)
 
-    with open(os.path.join(os.getcwd(), "bureau/models/preprocess_obj.pkl"),"wb") as f:
+    with open(os.path.join(os.getcwd(), "bureau/models/WOEpreprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
 
-    with open(os.path.join(os.getcwd(), "bureau/models/id2intent.pkl"),"wb") as f3:
+    with open(os.path.join(os.getcwd(), "bureau/models/WOEid2intent.pkl"),"wb") as f3:
         pickle.dump(data.id2intent,f3)
 

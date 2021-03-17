@@ -1,13 +1,17 @@
 {
+    "entity" : true,
     "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
-    "epochs":10,
+    "epochs": 8,
     "batchSize": 64,
-    "smallTalk": true,
-    "action": true,
+    "smallTalk": false,
+    "action": false,
     "embedding": "custom",
-    "confidence": 0.6,
-    "entity" : true,
-    "clf" : "svcRBF",
+    "confidence": 0.1,
+    "clf" : "decTree",
+    "maxLength": 0,
+    "model": "Attention",
+    "folds": 5,
     "fallback" : "Sorry, I do not understand."
-}
+ }
+ 
