@@ -10,8 +10,12 @@
     "confidence": 0.1,
     "clf" : "decTree",
     "maxLength": 0,
-    "model": "Attention",
+    "model": "SimpleRNN",
     "folds": 5,
+    "dropout":0.3,
+    "recurrent_dropout": 0.3,
+    "lr": 0.0005,
+    "contextEmbeddingClf": "",
     "fallback" : "Sorry, I do not understand."
  }
  

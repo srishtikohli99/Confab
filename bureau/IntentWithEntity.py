@@ -250,21 +250,31 @@ class DesignModel():
         self.model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
         
         
-    def model_train(self,batch_size,num_epoch):
-        filepath = os.path.join(os.getcwd(),"bureau/models/weightsWE.best.hdf5")
-        call_back = ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto')
-        checkpoints = [call_back]
-        print("Fitting to model")
-        self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=num_epoch, validation_split=0.1, callbacks=checkpoints)
-        print("Model Training complete.")
+    def model_train(self,batch_size,num_epoch, folds_):
 
-        self.model.save(os.path.join(os.getcwd(),"bureau/models/IntentWithEntity"+".h5"))
+        y = []
+        folds = StratifiedKFold(n_splits=folds_, shuffle=True, random_state=256)
+        for i in range(len(self.y_train)):
+            for j in range(len(self.y_train[i])):
+                if self.y_train[i][j] == 1:
+                    y.append(j)
+        print(len(y))
+        y = np.array(y)
+        
+        for fold_, (trn_idx, val_idx) in enumerate(folds.split(self.x_train,y)):
+            strLog = "fold {}".format(fold_)
+            print(strLog)
+            name = "IntentWithEntity" + str(fold_) + ".h5"
+            filepath = os.path.join(os.getcwd(),"bureau/models/" + name)
+            call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
+            checkpoints = [call_back]
+            print("Fitting to model")
+            self.model.fit(self.x_train[trn_idx], self.y_train[trn_idx], batch_size=batch_size, epochs=num_epoch, validation_data = (self.x_train[val_idx], self.y_train[val_idx]), callbacks=checkpoints)
+            print("Model Training complete.")
+            self.model.save(os.path.join(os.getcwd(),"bureau/models/" + name))
 
-    def bidir_lstm(self,preprocess_obj,classes, embedding):
+    def bidir_lstm(self,preprocess_obj,classes, embedding, dropout, recurrent_dropout, lr):
 
-        dropout=0.3
-        recurrent_dropout=0.3
-        lr=0.0005
         ## Embedding Layer
         sequence_input = Input(shape=(preprocess_obj.max_len,))
         # self.model.add(Embedding(,,input_length=preprocess_obj.max_len))
@@ -301,9 +311,7 @@ class DesignModel():
             call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
             checkpoints = [call_back]
             print("Fitting to model")
-            self.model.fit(self.x_train[trn_idx], self.y_train[trn_idx], batch_size=batch_size, epochs=num_epoch, validation_data = (self.x_train[val_idx], self.y_train[val_idx]), callbacks=checkpoints)
-            print("Model Training complete.")
-            self.model.save(os.path.join(os.getcwd(),"bureau/models/" + name))
+        
 
 
 
@@ -312,15 +320,17 @@ class Prediction():
     def __init__(self, folds):
 
         self.folds = folds
+        self.Models = []
         with open(os.path.join(os.getcwd(),"config.json")) as f:
             config = json.load(f)
         if "embedding" in config.keys():
             self.embedding = config["embedding"]
         preprocess_obj = CustomUnpickler(open(os.path.join(os.getcwd(), 'bureau/models/WEpreprocess_obj.pkl'), 'rb')).load()
         if config["model"] == "SimpleRNN":
-            model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntity.h5'))
-        else:
-            self.Models = []
+            for i in range(self.folds):
+                model= keras.models.load_model(os.path.join(os.getcwd(), "bureau/models/IntentWithEntity" + str(i)+ ".h5"))
+                self.Models.append(model)
+        elif config["model"] == "Attention":
             for i in range(self.folds):
                 with CustomObjectScope({'AttentionLayer2': attention2}):
                     model= keras.models.load_model(os.path.join(os.getcwd(), "bureau/models/IntentWithEntityAttn" + str(i)+ ".h5"))
@@ -360,9 +370,18 @@ class Prediction():
         elif embedding == "custom" and model == "SimpleRNN":
             query_seq = self.tokenizer.texts_to_sequences([query])
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
-            pred = self.model.predict(query_pad)
+            for i in range(self.folds):
+                pred = self.Models[i].predict_step(query_pad)
+                # print(pred)
+                if i == 0:
+                    p = np.zeros(len(pred[0]))
+                    p=[p]
+                    # print(p)
+                for j in range(len(pred[0])):
+                    p[0][j] += pred[0][j]/self.folds
+            pred = p
 
-        else:
+        elif model == "Attention":
             
             query_seq = self.tokenizer.texts_to_sequences([query])
             query_pad = pad_sequences(query_seq, maxlen=self.max_len)
@@ -377,6 +396,8 @@ class Prediction():
                     p[0][j] += pred[0][j]/self.folds
             pred = p
             # print(pred)
+        else:
+            return 
 
         predi = np.argmax(pred)
         if test:
@@ -423,6 +444,12 @@ if __name__ == '__main__':
         model = config["model"]
     if "folds" in config.keys():
         folds = config["folds"]
+    if "dropout" in config.keys():
+        dropout = config["dropout"]
+    if "recurrent_dropout" in config.keys():
+        recurrent_dropout = config["recurrent_dropout"]
+    if "lr" in config.keys():
+        lr = config["lr"]
 
     data = LoadingData(smallTalk)
     preprocess_obj = Preprocessing(maxLength)
@@ -430,14 +457,10 @@ if __name__ == '__main__':
     model_obj = DesignModel(preprocess_obj)
     if model == "SimpleRNN":
         model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
-        model_obj.model_train(batchSize,epochs)
-    else:
-        model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding)
+        model_obj.model_train(batchSize,epochs, folds)
+    elif model == "Attention":
+        model_obj.bidir_lstm(preprocess_obj,data.category_id, embedding, dropout, recurrent_dropout, lr)
         model_obj.lstm_train(batchSize,epochs, folds)
-
-    # from keras.utils import CustomObjectScope
-    #     with CustomObjectScope({'AttentionLayer': attention}):
-    #         model= keras.models.load_model(os.path.join(os.getcwd(), 'bureau/models/IntentWithEntityAttn.h5'))
     
     with open(os.path.join(os.getcwd(),"bureau/models/WEpreprocess_obj.pkl"),"wb") as f:
         pickle.dump(preprocess_obj,f)
