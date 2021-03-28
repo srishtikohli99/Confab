@@ -37,6 +37,8 @@ from keras.layers.embeddings import Embedding
 from keras import optimizers
 from keras.utils import CustomObjectScope
 from sklearn.model_selection import StratifiedKFold
+from sentence_transformers import SentenceTransformer, InputExample, losses, models
+from torch.utils.data import DataLoader
 
 
 class CustomUnpickler(pickle.Unpickler):
@@ -57,6 +59,7 @@ class LoadingData():
         self.intent2id = {}
         self.category_id=0
         self.entityList = set()
+        self.tokens = set()
         print("Training Data Directory")
         print(train_file_path)
         data = {}
@@ -104,6 +107,7 @@ class LoadingData():
                 for i in each_list:
                     if 'entity' in i.keys():
                         entity = "entity" + i["entity"].replace(" ","").replace("_","")
+                        self.tokens.add(entity)
                         sent += entity + " "
                         self.entityList.add(entity)
                     else:
@@ -123,6 +127,7 @@ class Preprocessing():
         self.max_len = maxLength
         self.spacy_model = en_core_web_sm.load()
         self.tokenizer = None
+        self.train_examples = []
 
     def createData(self, data, maxLength, embedding):
 
@@ -133,6 +138,32 @@ class Preprocessing():
         self.max_len = maxLength
         self.x_train = data.train_data_frame['query'].tolist()
         self.y_train = data.train_data_frame['category'].tolist()
+
+        if embedding == "SentenceTransformers" : 
+
+            train_data = {}
+            for i in range(len(self.x_train)):
+                if self.y_train[i] not in train_data:
+                    train_data[self.y_train[i]] = []
+                train_data[self.y_train[i]].append(self.x_train[i])
+
+            for i in train_data:
+                self.train_examples.append(InputExample(texts = train_data[i], label = i))
+            
+            for i in range(len(self.x_train)):
+                self.x_train[i] = text_to_word_sequence(self.x_train[i])
+                sizes.append(len(self.x_train[i]))
+            sizes = np.array(sizes)
+            if maxLength == 0:
+                self.max_len = np.max(sizes)
+            with open(os.path.join(os.getcwd(), 'bureau/models/maxlength.pkl'), "wb") as f:
+                    pickle.dump(self.max_len,f)
+            
+            print("Setting maximum length to :")
+            print(self.max_len)
+            return
+
+
         self.tokenizer.fit_on_texts(list(self.x_train))
         for key in synonyms:
             if key in self.tokenizer.word_index:
@@ -208,6 +239,7 @@ class DesignModel():
         self.model = None
         self.x_train = preprocess_obj.x_train
         self.y_train = preprocess_obj.y_train
+        self.train_examples = preprocess_obj.train_examples
 
     def Word2VecEmbed(self, preprocess_obj):
         
@@ -311,6 +343,17 @@ class DesignModel():
             call_back = ModelCheckpoint(filepath, monitor='val_loss', save_best_only=True,  save_weights_only=False, mode='auto')
             checkpoints = [call_back]
             print("Fitting to model")
+
+    def sentenceTransformers(self,tokens,preprocess_obj,batch_size,num_epoch):
+
+        model = SentenceTransformer('distilbert-base-nli-mean-tokens')
+        word_embedding_model = model._first_module()
+        train_dataloader = DataLoader(self.train_examples, shuffle=True, batch_size=batch_size)
+        train_loss = losses.CosineSimilarityLoss(model)
+        print(tokens)
+        word_embedding_model.tokenizer.add_tokens(list(tokens), special_tokens=True)
+        word_embedding_model.auto_model.resize_token_embeddings(len(word_embedding_model.tokenizer))
+        model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=num_epoch, warmup_steps=100, output_path = os.path.join(os.getcwd(),"bureau/models/" + "ST"))
         
 
 
@@ -455,6 +498,10 @@ if __name__ == '__main__':
     preprocess_obj = Preprocessing(maxLength)
     preprocess_obj.createData(data, maxLength,embedding)
     model_obj = DesignModel(preprocess_obj)
+
+    if embedding == "SentenceTransformers":
+        model_obj.sentenceTransformers(data.tokens, preprocess_obj,batchSize,epochs)
+
     if model == "SimpleRNN":
         model_obj.simple_rnn(preprocess_obj,data.category_id, embedding)
         model_obj.model_train(batchSize,epochs, folds)

@@ -6,7 +6,7 @@
     "batchSize": 64,
     "smallTalk": false,
     "action": false,
-    "embedding": "custom",
+    "embedding": "SentenceTransformers",
     "confidence": 0.1,
     "clf" : "decTree",
     "maxLength": 0,
