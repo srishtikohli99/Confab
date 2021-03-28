@@ -1,6 +1,13 @@
 entityExtractor=$(cat config.json | jq '.entityExtractor' | tr -d \")
 entity=`cat config.json | jq '.entity'`
 en="flair"
+aug=`cat config.json | jq '.augment'`
+
+if [ $aug = true ]
+then
+    echo "----------------------Augmenting data-----------------------------"
+    python textAug/aug.py
+fi
 
 if [ $entity = true ]
 then

@@ -77,17 +77,24 @@ class LoadingData():
                     f = open(os.path.join(path,str(fil)))
                     dat = json.load(f)
                     for key in dat:
-                        data[key] = dat[key]
-                        self.intent2id[key] = self.category_id
-                        self.category_id+=1
+                        if key in data:
+                            data[key].append(dat)
+                        else:
+                            data[key] = dat[key]
+                            self.intent2id[key] = self.category_id
+                            self.category_id+=1
 
             elif str(file) != "SmallTalk":
                 f = open(os.path.join(train_file_path,str(file)))
                 dat = json.load(f)
                 for key in dat:
-                    data[key] = dat[key]
-                    self.intent2id[key] = self.category_id
-                    self.category_id+=1
+                    if key in data:
+                        data[key].extend(dat[key])
+                    else:
+                        data[key] = dat[key]
+                        self.intent2id[key] = self.category_id
+                        self.category_id+=1
+
 
         self.data = data
         training_data=self.data_helper()
@@ -95,7 +102,6 @@ class LoadingData():
         for key in self.intent2id:
             self.id2intent[self.intent2id[key]]=key
         self.train_data_frame = self.train_data_frame.sample(frac = 1)
-        # self.train_data_frame.to_csv("out.csv")
 
     def data_helper(self):
         sent_list = list()
