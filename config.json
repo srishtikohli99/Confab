@@ -1,13 +1,21 @@
 {
+    "entity" : true,
     "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
-    "epochs":10,
+    "epochs": 8,
     "batchSize": 64,
-    "smallTalk": true,
-    "action": true,
+    "smallTalk": false,
+    "action": false,
     "embedding": "custom",
-    "confidence": 0.6,
-    "entity" : true,
-    "clf" : "svcRBF",
+    "confidence": 0.1,
+    "clf" : "decTree",
+    "maxLength": 0,
+    "model": "SimpleRNN",
+    "folds": 5,
+    "dropout":0.3,
+    "recurrent_dropout": 0.3,
+    "lr": 0.0005,
+    "contextEmbeddingClf": "",
     "fallback" : "Sorry, I do not understand."
-}
+ }
+ 

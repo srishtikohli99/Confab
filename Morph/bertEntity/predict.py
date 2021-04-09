@@ -40,10 +40,7 @@ def bert_token_reconstruct(resultTags, bert_tokens):
 def predictor(sentence):
 
     meta_data = joblib.load(config.META_PATH)
-    enc_pos = meta_data["enc_pos"]
     enc_tag = meta_data["enc_tag"]
-
-    num_pos = len(list(enc_pos.classes_))
     num_tag = len(list(enc_tag.classes_))
 
     # sentence = """
@@ -60,12 +57,11 @@ def predictor(sentence):
 
     test_dataset = dataset.EntityDataset(
         texts=[sentence], 
-        pos=[[0] * len(sentence)], 
         tags=[[0] * len(sentence)]
     )
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = EntityModel(num_tag=num_tag, num_pos=num_pos)
+    model = EntityModel(num_tag=num_tag)
     model.load_state_dict(torch.load(config.MODEL_PATH, map_location=torch.device(device)))
     model.to(device)
 
@@ -73,7 +69,7 @@ def predictor(sentence):
         data = test_dataset[0]
         for k, v in data.items():
             data[k] = v.to(device).unsqueeze(0)
-        tag, pos, _ = model(**data)
+        tag, _ = model(**data)
 
         resultTags = list(enc_tag.inverse_transform(
                 tag.argmax(2).cpu().numpy().reshape(-1)
