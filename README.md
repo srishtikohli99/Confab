@@ -23,4 +23,13 @@ optimize AI-powered interactive chatbots without worrying about the underlying a
 
 ### Testing
 
+### REST Service
+
+Once all the models are trained, Confab will start acting as bot-as-a-service.
+REST endpoint is served using FastAPI.
+
+```
+uvicorn app:api --host 0.0.0.0 --port <PORT_NUMBER>  --reload
+```
+
 
