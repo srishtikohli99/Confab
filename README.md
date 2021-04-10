@@ -15,7 +15,7 @@ optimize AI-powered interactive chatbots without worrying about the underlying a
 ---
 
 ## Architecture Diagram
-
+<img src="./images/training_pipeline.png">
 
 ## Usage
 
