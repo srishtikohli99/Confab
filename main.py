@@ -26,7 +26,7 @@ if __name__ == '__main__':
             break
         if config["entity"]:
             if config["entityExtractor"] == "flair":
-                entities = pred_flair.FlairPredict(phrase)
+                entities = pred_flair.predict(phrase)#FlairPredict(phrase)
             else:
                 entities = entity_extraction_bert(phrase)
         else:

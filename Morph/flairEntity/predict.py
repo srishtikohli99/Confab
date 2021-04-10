@@ -2,7 +2,7 @@ from .train import Prediction
 
 predict = Prediction()
 
-def FlairPredict(phrase):
+def predictor(phrase):
     sentence = predict.predict(phrase)
     text = sentence.to_dict('ner')["text"]
     n = len(text)
