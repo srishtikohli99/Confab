@@ -14,7 +14,7 @@ optimize AI-powered interactive chatbots without worrying about the underlying a
 
 ## Architecture Diagram
 <p align="center">
-<img src="./images/trainingPipeline.png" width="500">
+<img src="./images/trainingPipeline.png" width="800">
 </p>
 
 ## Usage
