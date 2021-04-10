@@ -11,11 +11,10 @@ optimize AI-powered interactive chatbots without worrying about the underlying a
         <img src="https://img.shields.io/badge/status-WIP-yellow">
     </p>
 </p>
-
 ---
 
 ## Architecture Diagram
-<img src="./images/training_pipeline.png">
+<img src="./images/training_pipeline.png" width="500">
 
 ## Usage
 
