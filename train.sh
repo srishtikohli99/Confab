@@ -17,7 +17,7 @@ then
         python Morph/flairEntity/train.py
     fi
     echo "-----------------Training Bureau ML Classifier----------------------"
-    python bureau/EntityClassifier.py
+    python bureau/StatisticalClassifier.py
     echo "-----------------Training Bureau LSTM With Entities----------------------"
     python bureau/IntentWithEntity.py
 fi

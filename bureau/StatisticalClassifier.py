@@ -9,21 +9,25 @@ import pickle
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.tree import DecisionTreeClassifier
+if __name__ == '__main__':
+    from constants import *
+else:
+    from .constants import *
 
 class LoadingData():
         
     def __init__(self, test = False):
         if test:
-            train_file_path = os.path.join(os.getcwd(),"data/Validate")
+            train_file_path = TRAIN_FILE_PATH
         else:
-            train_file_path = os.path.join(os.getcwd(),"data")
+            train_file_path = VALIDATE_FILE_PATH
         self.data = {}
         self.intent=[]
         self.phrases = []
         for file in os.listdir(train_file_path):
-            if str(file) == ".DS_Store":
+            if not str(file).endswith(".json"):
                 continue
-            if str(file) != "SmallTalk" and str(file)!="Validate":
+            else:
                 f = open(os.path.join(train_file_path,str(file)))
                 dat = json.load(f)
                 for key in dat:
@@ -79,7 +83,7 @@ class Classifier:
         accuracy = accuracy_score(data.intent,intent)
         print("Training Score")
         print(accuracy)
-        with open(os.path.join(os.getcwd(), 'bureau/models/entityClassifier.pkl'), "wb") as f:
+        with open(STATISTICAL_CLASSIFIER, "wb") as f:
                 pickle.dump(self.pipe, f)
     
 
@@ -88,7 +92,7 @@ class Predict:
 
     def __init__(self):
 
-        with open(os.path.join(os.getcwd(), 'bureau/models/entityClassifier.pkl'), "rb") as f:
+        with open(STATISTICAL_CLASSIFIER, "rb") as f:
             self.pipe = pickle.load(f)
 
     def predict(self, phrase):
@@ -107,9 +111,11 @@ class Predict:
 
 if __name__ == '__main__':
     
-    with open(os.path.join(os.getcwd(),"config.json")) as f:
+    with open(CONFIG) as f:
         config = json.load(f)
+
     clf = "randomforest"
+
     if "clf" in config.keys():
         clf = config["clf"]
 

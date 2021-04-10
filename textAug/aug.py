@@ -1,22 +1,23 @@
 import json
 import os
+import constants
 
-syn_path = open(os.path.join(os.getcwd(),"synonyms.json"))
+syn_path = open(constants.SYNONYMS_FILE_PATH)
 synonyms = json.load(syn_path)
 print(synonyms)
 
-train_file_path = os.path.join(os.getcwd(), "data")
+train_file_path = constants.TRAIN_FILE_PATH
 files = []
 
 for file in os.listdir(train_file_path):
-    if str(file).endswith(".json") and not str(file).endswith("AUG.json"):
+    if str(file).endswith(".json") and not str(file).endswith(constants.AUGMENTED_TEXT_EXTENSION):
         files.append(str(file))
     
 for file in files:
 
     newJS = {}
     print(str(file))
-    name = str(file)[:-5]+"AUG.json"
+    name = str(file)[:-5]+constants.AUGMENTED_TEXT_EXTENSION
     path = os.path.join(train_file_path, name)
     f = open(os.path.join(train_file_path, file))
     dat = json.load(f)

@@ -2,7 +2,7 @@ from IntentWithoutEntity import Prediction as PredictionWOE
 from IntentWithEntity import Prediction as PredictionWE
 # from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
 # from .IntentWithEntity import Preprocessing, LoadingData, DesignModel
-# from .EntityClassifier import LoadingData, Classifier, Predict
+# from . import LoadingData, Classifier, Predict
 # import os
 # import json
 

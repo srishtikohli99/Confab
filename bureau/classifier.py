@@ -2,11 +2,12 @@ from .IntentWithoutEntity import Prediction as PredictionWOE
 from .IntentWithEntity import Prediction as PredictionWE
 from .IntentWithoutEntity import Preprocessing, LoadingData, DesignModel
 from .IntentWithEntity import Preprocessing, LoadingData, DesignModel
-from .EntityClassifier import LoadingData, Classifier, Predict
+from .StatisticalClassifier import LoadingData, Classifier, Predict
+from .constants import CONFIG
 import os
 import json
 
-with open(os.path.join(os.getcwd(),"config.json")) as f:
+with open(CONFIG)) as f:
     config = json.load(f)
 embedding = config["embedding"]
 confidence = config["confidence"]
