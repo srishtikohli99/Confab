@@ -1,5 +1,6 @@
 {
     "entity" : true,
+    "augment" : true,
     "entityExtractor" :"bert",
     "flairEmbedding" : "glove",
     "epochs": 8,

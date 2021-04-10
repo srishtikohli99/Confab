@@ -32,6 +32,7 @@ def intent_classify(phrase, entities):
         
         WOE, r = pred_objWOE.predict(phrase, embedding, model)
         print(WOE[r])
+        return WOE[r]
 
     elif entityExtractor == "flair":
         phrase_modified = entities[0]
@@ -49,8 +50,10 @@ def intent_classify(phrase, entities):
                 print(r)
                 print(WOE[r])
                 print(WE[r])
+                return r
             else:
                 print(fallback)
+                return fallback
         else:
             WOE, r1 = pred_objWOE.predict(phrase, embedding, model)
             WE, r2 = pred_objWE.predict(phrase_modified, embedding, model)
@@ -59,6 +62,7 @@ def intent_classify(phrase, entities):
             if r1 == r2 and r1 == r3:
                 print(WOE[r1])
                 print(WE[r2])
+                return r1
             else:
                 maximum = 0
                 for key in WE:
@@ -69,8 +73,10 @@ def intent_classify(phrase, entities):
                     print(WOE[r])
                     print(WE[r])
                     print(r)
+                    return r
                 else:
                     print(fallback)
+                    return fallback
 
 
 
@@ -89,7 +95,7 @@ def intent_classify(phrase, entities):
                 return r
             else:
                 print(fallback)
-                return r
+                return fallback
 
         
         else:
@@ -122,4 +128,4 @@ def intent_classify(phrase, entities):
                     return r
                 else:
                     print(fallback)
-                    return r
+                    return fallback
