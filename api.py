@@ -26,8 +26,8 @@ def bot_response(utterance: str):
         entities = None
 
 
-    response_text = classifier.intent_classify(phrase, entities)
-    return {"response_text": response_text}
+    intent = classifier.intent_classify(phrase, entities)
+    return {"intent": intent, "entities": entities}
 
 def entity_extraction_bert(phrase):
 
